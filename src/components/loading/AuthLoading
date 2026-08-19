@@ -1,0 +1,240 @@
+"use client";
+
+import { memo } from "react";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { BrandLogo } from "@/components/branding/BrandLogo";
+import { AUTH_NAV_MESSAGES } from "./loading-messages";
+
+/**
+ * Fullscreen authentication loading overlay.
+ *
+ * This is NOT a page — it is a fullscreen overlay that hides the page
+ * transition underneath while an unauthenticated user navigates to an
+ * authentication route (signup / login / forgot-password).
+ *
+ * Design: Prosventa branding, modern, premium, minimal, professional.
+ * No neon, no gaming effects.
+ *
+ * Animation: Smooth 60 FPS, GPU-accelerated transforms only (transform +
+ * opacity). No layout shifts, no stuttering, no bouncing. Fade + subtle
+ * scale. Soft animated gradient background. Elegant loading indicator.
+ *
+ * Messages: Authentication-related messages, one at a time, fading smoothly.
+ *
+ * Timing: Minimum 1.2s, maximum only until the destination page is ready.
+ *
+ * Never used for dashboard routes.
+ */
+
+const EASE = [0.16, 1, 0.3, 1] as const;
+const FADE_OUT_MS = 280;
+const MESSAGE_INTERVAL_MS = 900;
+
+interface AuthLoadingOverlayProps {
+  active: boolean;
+  ready: boolean;
+  messages?: string[];
+  minDuration?: number;
+  onFadeComplete?: () => void;
+}
+
+function AuthLoadingOverlayImpl({
+  active,
+  ready,
+  messages,
+  minDuration = 1200,
+  onFadeComplete,
+}: AuthLoadingOverlayProps) {
+  const reduce = useReducedMotion();
+  const [visible, setVisible] = useState(false);
+  const [exiting, setExiting] = useState(false);
+  const [messageIndex, setMessageIndex] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const rafRef = useRef<number | null>(null);
+  const showTimeRef = useRef(0);
+  const fadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const messageList = useMemo(
+    () => messages ?? AUTH_NAV_MESSAGES,
+    [messages]
+  );
+
+  // Show overlay when active becomes true
+  useEffect(() => {
+    if (active) {
+      setVisible(true);
+      setExiting(false);
+      setProgress(0.05);
+      showTimeRef.current = performance.now();
+    } else {
+      setVisible(false);
+      setExiting(false);
+    }
+  }, [active]);
+
+  // Cycle authentication messages with smooth fades
+  useEffect(() => {
+    if (!active) return;
+    setMessageIndex(0);
+    const interval = setInterval(() => {
+      setMessageIndex((prev) => (prev + 1) % messageList.length);
+    }, MESSAGE_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [active, messageList.length]);
+
+  // Drive the elegant progress indicator (GPU-accelerated scaleX)
+  useEffect(() => {
+    if (!active) return;
+
+    const tick = (now: number) => {
+      const elapsed = now - showTimeRef.current;
+      const duration = Math.max(minDuration, 1200);
+      const t = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setProgress(0.05 + eased * 0.95);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [active, minDuration]);
+
+  // Fade out when `ready` is true AND minimum duration has elapsed
+  useEffect(() => {
+    if (!active || !ready) return;
+
+    const elapsed = performance.now() - showTimeRef.current;
+    const remaining = Math.max(minDuration - elapsed, 0);
+
+    fadeTimerRef.current = setTimeout(() => {
+      setExiting(true);
+      setVisible(false);
+    }, remaining);
+
+    return () => {
+      if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
+    };
+  }, [active, ready, minDuration]);
+
+  if (reduce) return null;
+
+  return (
+    <AnimatePresence onExitComplete={onFadeComplete}>
+      {visible && (
+        <motion.div
+          className="fixed inset-0 z-[10000] flex items-center justify-center overflow-hidden"
+          style={{
+            pointerEvents: exiting ? "none" : "auto",
+            willChange: "opacity",
+          }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: FADE_OUT_MS / 1000, ease: EASE }}
+          aria-hidden="true"
+          role="status"
+          aria-live="polite"
+        >
+          {/* Soft gradient background base */}
+          <motion.div
+            className="absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #f8fafc 100%)",
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4, ease: EASE }}
+          />
+          {/* Animated gradient layer — subtle, premium, no neon.
+              GPU-accelerated: uses transform (translate) instead of
+              background-position to avoid layout/paint thrashing.
+              Oversized (inset -25%) so the translate never reveals edges. */}
+          <motion.div
+            className="absolute inset-[-25%]"
+            style={{
+              background:
+                "linear-gradient(120deg, rgba(59,130,246,0.04) 0%, rgba(99,102,241,0.04) 35%, rgba(14,165,233,0.03) 70%, rgba(59,130,246,0.04) 100%)",
+              willChange: "transform",
+            }}
+            animate={{
+              transform: [
+                "translate(-8%, -8%)",
+                "translate(8%, 8%)",
+                "translate(-8%, -8%)",
+              ],
+            }}
+            transition={{
+              duration: 12,
+              ease: "easeInOut",
+              repeat: Infinity,
+            }}
+          />
+
+          {/* Ambient premium glow — soft, minimal */}
+          <div
+            className="absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full"
+            style={{
+              background:
+                "radial-gradient(circle, rgba(59, 130, 246, 0.06) 0%, transparent 60%)",
+            }}
+          />
+
+          {/* Content — fade + subtle scale, GPU-accelerated */}
+          <motion.div
+            className="relative flex flex-col items-center gap-8"
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ duration: 0.3, ease: EASE }}
+            style={{ willChange: "transform, opacity" }}
+          >
+            {/* Prosventa logo */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: EASE }}
+            >
+              <BrandLogo size="lg" iconSize={24} strokeWidth={2.2} shadow />
+            </motion.div>
+
+            {/* Authentication loading message — one at a time, smooth fade */}
+            <div className="flex h-6 items-center justify-center">
+              <AnimatePresence mode="wait">
+                <motion.p
+                  key={messageIndex}
+                  className="text-[13px] font-medium tracking-tight text-slate-500"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.22, ease: EASE }}
+                >
+                  {messageList[messageIndex]}
+                </motion.p>
+              </AnimatePresence>
+            </div>
+
+            {/* Elegant loading indicator — thin, premium, GPU-accelerated */}
+            <div className="h-[2px] w-52 overflow-hidden rounded-full bg-slate-200/70">
+              <motion.div
+                className="h-full rounded-full bg-gradient-to-r from-blue-600 via-blue-500 to-blue-400"
+                style={{
+                  transformOrigin: "left",
+                  boxShadow: "0 0 8px rgba(59, 130, 246, 0.25)",
+                  willChange: "transform",
+                }}
+                animate={{ scaleX: progress }}
+                transition={{ duration: 0.1, ease: "linear" }}
+              />
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+export const AuthLoadingOverlay = memo(AuthLoadingOverlayImpl);

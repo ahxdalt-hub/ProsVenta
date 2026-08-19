@@ -1,0 +1,56 @@
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import { RouteTransitionProvider } from "@/components/transitions/RouteTransitionProvider";
+import { WorkspaceLoadingProvider } from "@/components/loading/WorkspaceLoadingProvider";
+import { ToastProvider } from "@/components/ui/toast";
+import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
+});
+
+export const metadata: Metadata = {
+  title: "Prosventa — Find Qualified B2B Prospects Faster",
+  description:
+    "Prosventa helps businesses discover and organize targeted prospects with a simple, modern workflow.",
+  openGraph: {
+    title: "Prosventa — Find Qualified B2B Prospects Faster",
+    description:
+      "Prosventa helps businesses discover and organize targeted prospects with a simple, modern workflow.",
+    type: "website",
+    siteName: "Prosventa",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Prosventa — Find Qualified B2B Prospects Faster",
+    description:
+      "Prosventa helps businesses discover and organize targeted prospects with a simple, modern workflow.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en" data-scroll-behavior="smooth">
+      <body className={`${inter.variable} antialiased`}>
+        <a href="#main-content" className="skip-link">
+          Skip to main content
+        </a>
+        <ToastProvider>
+          <WorkspaceLoadingProvider>
+            <RouteTransitionProvider>{children}</RouteTransitionProvider>
+          </WorkspaceLoadingProvider>
+        </ToastProvider>
+      </body>
+    </html>
+  );
+}

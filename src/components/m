@@ -1,0 +1,96 @@
+"use client";
+
+import { motion } from "framer-motion";
+import { ArrowRight } from "lucide-react";
+import TransitionButton from "@/components/transitions/TransitionButton";
+import { MARKETING_ROUTES } from "@/components/marketing/routes";
+import HeroProductVisual from "./HeroProductVisual";
+
+const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
+
+const container = {
+  hidden: {},
+  show: {
+    transition: {
+      staggerChildren: 0.12,
+      delayChildren: 0.1,
+    },
+  },
+};
+
+const item = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } },
+};
+
+export default function Hero() {
+  return (
+    <section className="relative overflow-hidden bg-slate-50">
+      {/* Ambient background — restrained brand depth, no neon */}
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        <div className="grid-pattern absolute inset-0 [mask-image:radial-gradient(ellipse_70%_60%_at_50%_0%,black,transparent)]" />
+        <div className="absolute -top-40 left-1/2 h-[480px] w-[720px] -translate-x-1/2 rounded-full bg-blue-500/[0.05] blur-3xl" />
+      </div>
+
+      <div className="relative mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 items-center gap-16 pt-32 pb-24 lg:grid-cols-[1.05fr_0.95fr] lg:gap-12 lg:pt-40 lg:pb-32 xl:gap-16">
+          {/* Left — Copy */}
+          <motion.div
+            variants={container}
+            initial="hidden"
+            animate="show"
+            className="max-w-xl"
+          >
+            {/* Eyebrow */}
+            <motion.div variants={item}>
+              <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-xs">
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                Prospect intelligence for modern sales teams
+              </span>
+            </motion.div>
+
+            {/* Headline */}
+            <motion.h1
+              variants={item}
+              className="mt-6 text-5xl font-semibold tracking-tight text-slate-900 sm:text-6xl xl:text-[68px] xl:leading-[1.05]"
+            >
+              Find the prospects{" "}
+              <span className="text-gradient">worth pursuing.</span>
+            </motion.h1>
+
+            {/* Supporting copy */}
+            <motion.p
+              variants={item}
+              className="mt-6 max-w-lg text-lg leading-relaxed text-slate-600"
+            >
+              Discover, understand, prioritize, and act on the companies that
+              matter to your sales team.
+            </motion.p>
+
+            {/* CTAs */}
+            <motion.div variants={item} className="mt-10 flex flex-wrap items-center gap-4">
+              <TransitionButton
+                href={MARKETING_ROUTES.GET_STARTED}
+                className="btn-press inline-flex items-center justify-center rounded-xl bg-navy-900 px-6 py-3 text-sm font-semibold text-white shadow-md hover:bg-navy-800 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              >
+                Get Started
+              </TransitionButton>
+              <TransitionButton
+                href={`${MARKETING_ROUTES.EXPLORE}`}
+                className="btn-press group inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-700 shadow-xs hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              >
+                Explore Prosventa
+                <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+              </TransitionButton>
+            </motion.div>
+          </motion.div>
+
+          {/* Right — Product Visual */}
+          <div className="relative">
+            <HeroProductVisual />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
