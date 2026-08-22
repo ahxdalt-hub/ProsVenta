@@ -12,8 +12,6 @@ export type SettingsSection =
   | "notifications"
   | "security"
   | "workspace"
-  | "billing"
-  | "integrations"
   | "accessibility"
   | "about"
   | "support"
@@ -84,26 +82,6 @@ const NAV_GROUPS: NavGroup[] = [
             <circle cx="12" cy="12" r="10" />
             <circle cx="12" cy="12" r="6" />
             <circle cx="12" cy="12" r="2" />
-          </svg>
-        ),
-      },
-      {
-        id: "billing",
-        label: "Billing",
-        icon: (
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="2" y="5" width="20" height="14" rx="2" />
-            <line x1="2" y1="10" x2="22" y2="10" />
-          </svg>
-        ),
-      },
-      {
-        id: "integrations",
-        label: "Integrations",
-        icon: (
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="16 18 22 12 16 6" />
-            <polyline points="8 6 2 12 8 18" />
           </svg>
         ),
       },

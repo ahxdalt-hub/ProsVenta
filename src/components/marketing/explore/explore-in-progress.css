@@ -1,0 +1,324 @@
+/* ==========================================================================
+   Explore — colorful in-progress experience
+   GPU-friendly: opacity + transform only. 0% / 100% match for seamless loops.
+   ========================================================================== */
+
+.explore-page {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(99, 102, 241, 0.16), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 100% 100%, rgba(34, 211, 238, 0.12), transparent 50%),
+    #f4f7ff;
+}
+
+/* --- Aurora blobs ------------------------------------------------------- */
+.explore-aurora {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(64px);
+  will-change: transform, opacity;
+}
+
+.explore-aurora-1 {
+  top: 6%;
+  left: 12%;
+  width: 420px;
+  height: 420px;
+  background: rgba(99, 102, 241, 0.28);
+  animation: explore-aurora-drift 14s ease-in-out infinite;
+}
+
+.explore-aurora-2 {
+  top: 18%;
+  right: 8%;
+  width: 380px;
+  height: 380px;
+  background: rgba(34, 211, 238, 0.22);
+  animation: explore-aurora-drift 18s ease-in-out infinite reverse;
+}
+
+.explore-aurora-3 {
+  bottom: 4%;
+  left: 28%;
+  width: 340px;
+  height: 340px;
+  background: rgba(236, 72, 153, 0.16);
+  animation: explore-aurora-drift 16s ease-in-out infinite;
+  animation-delay: -4s;
+}
+
+.explore-aurora-4 {
+  bottom: 12%;
+  right: 22%;
+  width: 280px;
+  height: 280px;
+  background: rgba(245, 158, 11, 0.18);
+  animation: explore-aurora-drift 20s ease-in-out infinite reverse;
+  animation-delay: -7s;
+}
+
+@keyframes explore-aurora-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.85; }
+  40% { transform: translate(28px, -22px) scale(1.08); opacity: 1; }
+  70% { transform: translate(-18px, 16px) scale(0.96); opacity: 0.75; }
+}
+
+/* --- Status badge ------------------------------------------------------- */
+.explore-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 9999px;
+  padding: 7px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #4338ca;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(238, 242, 255, 0.7));
+  border: 1px solid rgba(99, 102, 241, 0.22);
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.12);
+  backdrop-filter: blur(10px);
+}
+
+.explore-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: #22d3ee;
+  box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.22);
+  animation: explore-dot-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes explore-dot-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.25); opacity: 0.7; }
+}
+
+.explore-headline-accent {
+  background: linear-gradient(120deg, #4f46e5 0%, #2563eb 42%, #06b6d4 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* --- Stage + logo ------------------------------------------------------- */
+.explore-stage {
+  position: relative;
+  width: 280px;
+  height: 280px;
+}
+
+.explore-glow {
+  position: absolute;
+  inset: 18%;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.35) 0%, rgba(34, 211, 238, 0.18) 42%, transparent 70%);
+  animation: explore-glow-breathe 6s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes explore-glow-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.12); opacity: 1; }
+}
+
+.explore-rings {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.explore-ring {
+  transform-origin: 140px 140px;
+  will-change: transform, opacity;
+}
+
+.explore-ring-a {
+  animation: explore-spin 14s linear infinite;
+}
+
+.explore-ring-b {
+  animation: explore-spin 19s linear infinite reverse;
+}
+
+.explore-ring-c {
+  animation: explore-spin 11s linear infinite;
+  opacity: 0.85;
+}
+
+@keyframes explore-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.explore-sat {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 9999px;
+  will-change: transform;
+}
+
+.explore-sat-1 {
+  background: #6366f1;
+  box-shadow: 0 0 12px 3px rgba(99, 102, 241, 0.55);
+  animation: explore-orbit-1 9s linear infinite;
+}
+
+.explore-sat-2 {
+  background: #22d3ee;
+  box-shadow: 0 0 12px 3px rgba(34, 211, 238, 0.5);
+  animation: explore-orbit-2 12s linear infinite;
+}
+
+.explore-sat-3 {
+  background: #f59e0b;
+  box-shadow: 0 0 12px 3px rgba(245, 158, 11, 0.5);
+  animation: explore-orbit-3 15s linear infinite reverse;
+}
+
+.explore-sat-4 {
+  background: #ec4899;
+  box-shadow: 0 0 12px 3px rgba(236, 72, 153, 0.45);
+  animation: explore-orbit-4 8s linear infinite;
+}
+
+@keyframes explore-orbit-1 {
+  from { transform: rotate(0deg) translateX(118px) rotate(0deg); }
+  to { transform: rotate(360deg) translateX(118px) rotate(-360deg); }
+}
+
+@keyframes explore-orbit-2 {
+  from { transform: rotate(80deg) translateX(96px) rotate(-80deg); }
+  to { transform: rotate(440deg) translateX(96px) rotate(-440deg); }
+}
+
+@keyframes explore-orbit-3 {
+  from { transform: rotate(160deg) translateY(108px) rotate(-160deg); }
+  to { transform: rotate(520deg) translateY(108px) rotate(-520deg); }
+}
+
+@keyframes explore-orbit-4 {
+  from { transform: rotate(240deg) translateX(78px) rotate(-240deg); }
+  to { transform: rotate(600deg) translateX(78px) rotate(-600deg); }
+}
+
+.explore-mark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: flex;
+  height: 108px;
+  width: 108px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 28px;
+  background: linear-gradient(160deg, #ffffff 0%, #eef2ff 55%, #e0f2fe 100%);
+  box-shadow:
+    0 18px 40px rgba(79, 70, 229, 0.22),
+    0 0 0 1px rgba(99, 102, 241, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transform: translate(-50%, -50%);
+  animation: explore-mark-float 6.5s ease-in-out infinite;
+  will-change: transform;
+}
+
+@keyframes explore-mark-float {
+  0%, 100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+  50% { transform: translate(-50%, -54%) scale(1.04) rotate(-2deg); }
+}
+
+/* --- Microcopy: one full line at a time, 4 equal 3s slots in a 12s loop */
+@keyframes explore-microcopy {
+  0% { opacity: 0; transform: translateY(8px); }
+  5%, 20% { opacity: 1; transform: translateY(0); }
+  25%, 100% { opacity: 0; transform: translateY(-8px); }
+}
+
+.explore-microcopy {
+  opacity: 0;
+  animation: explore-microcopy 12s ease-in-out infinite both;
+  will-change: opacity, transform;
+}
+
+.explore-microcopy-1 { animation-delay: 0s; }
+.explore-microcopy-2 { animation-delay: 3s; }
+.explore-microcopy-3 { animation-delay: 6s; }
+.explore-microcopy-4 { animation-delay: 9s; }
+
+/* --- Back button -------------------------------------------------------- */
+.explore-back {
+  background: linear-gradient(135deg, #4f46e5 0%, #2563eb 50%, #0891b2 100%);
+  box-shadow: 0 12px 28px rgba(37, 99, 235, 0.28);
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 200ms ease;
+}
+
+.explore-back:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 32px rgba(37, 99, 235, 0.36);
+}
+
+.explore-back:focus {
+  outline: none;
+}
+
+.explore-back:focus-visible {
+  box-shadow: 0 0 0 3px #fff, 0 0 0 5px rgba(59, 130, 246, 0.55);
+}
+
+/* --- Reduced motion ----------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .explore-aurora,
+  .explore-glow,
+  .explore-ring,
+  .explore-sat,
+  .explore-mark,
+  .explore-badge-dot,
+  .explore-microcopy {
+    animation: none !important;
+  }
+
+  .explore-aurora {
+    opacity: 0.7;
+  }
+
+  .explore-glow {
+    opacity: 0.8;
+  }
+
+  .explore-mark {
+    transform: translate(-50%, -50%);
+  }
+
+  .explore-sat-1 { transform: rotate(20deg) translateX(118px); }
+  .explore-sat-2 { transform: rotate(110deg) translateX(96px); }
+  .explore-sat-3 { transform: rotate(200deg) translateY(108px); }
+  .explore-sat-4 { transform: rotate(300deg) translateX(78px); }
+
+  .explore-microcopy {
+    opacity: 0;
+  }
+
+  .explore-microcopy-1 {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .explore-stage {
+    width: 240px;
+    height: 240px;
+  }
+
+  .explore-mark {
+    height: 92px;
+    width: 92px;
+    border-radius: 24px;
+  }
+}

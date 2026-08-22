@@ -385,10 +385,16 @@ export async function getDistinctTags(): Promise<string[]> {
  */
 export async function getOrganizationMembers(): Promise<{ id: string; full_name: string | null }[]> {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return [];
 
   const { data: membership } = await supabase
     .from("organization_members")
     .select("organization_id")
+    .eq("user_id", user.id)
     .single();
 
   if (!membership) return [];

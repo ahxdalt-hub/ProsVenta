@@ -118,31 +118,31 @@ const ROLE_PERMISSIONS: Record<OrganizationRole, Permission[]> = {
 export const ROLE_DEFINITIONS: Record<OrganizationRole, RoleDefinition> = {
   owner: {
     label: "Owner",
-    description: "Full control over the workspace, including billing, deletion, and ownership transfer.",
+    description: "Full control of the workspace and its organization settings.",
     badgeVariant: "primary",
     permissions: ROLE_PERMISSIONS.owner,
   },
   admin: {
     label: "Admin",
-    description: "Can manage members and workspace content, but cannot delete or transfer the workspace.",
+    description: "Can help manage the workspace and its members.",
     badgeVariant: "default",
     permissions: ROLE_PERMISSIONS.admin,
   },
   manager: {
     label: "Manager",
-    description: "Can manage prospects, lists, and team assignments with full editing capabilities.",
+    description: "Manages prospects, lists, and team assignments.",
     badgeVariant: "success",
     permissions: ROLE_PERMISSIONS.manager,
   },
   sales: {
     label: "Sales",
-    description: "Can create, edit, and assign prospects to collaborate with the team.",
+    description: "Uses Prosventa for day-to-day prospect work without managing access.",
     badgeVariant: "neutral",
     permissions: ROLE_PERMISSIONS.sales,
   },
   viewer: {
     label: "Viewer",
-    description: "Read-only access to workspace data with the ability to comment.",
+    description: "Can view workspace data without making changes.",
     badgeVariant: "warning",
     permissions: ROLE_PERMISSIONS.viewer,
   },
@@ -173,6 +173,20 @@ export function canManageRole(
   targetRole: OrganizationRole | null | undefined
 ): boolean {
   if (!actorRole || !targetRole) return false;
+  return ROLE_LEVELS[actorRole] > ROLE_LEVELS[targetRole];
+}
+
+/**
+ * Checks if the actor role is allowed to assign the given target role.
+ * A role can only assign roles strictly below its own hierarchy level.
+ * The owner role can never be assigned by anyone (no ownership transfer in V1).
+ */
+export function canAssignRole(
+  actorRole: OrganizationRole | null | undefined,
+  targetRole: OrganizationRole | null | undefined
+): boolean {
+  if (!actorRole || !targetRole) return false;
+  if (targetRole === "owner") return false;
   return ROLE_LEVELS[actorRole] > ROLE_LEVELS[targetRole];
 }
 

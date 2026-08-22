@@ -3,15 +3,12 @@
 import { createClient } from "@/lib/supabase/server";
 import type {
   ProspectComment,
-  ProspectCommentInsert,
   ActivityEvent,
   ActivityEventInsert,
   ActivityAction,
   Notification,
   NotificationInsert,
-  NotificationType,
   OrganizationInvitation,
-  OrganizationInvitationInsert,
   OrganizationRole,
 } from "@/types/database";
 
@@ -491,6 +488,21 @@ export async function createInvitation(email: string, role: OrganizationRole): P
     return { error: "Only owners and admins can invite members." };
   }
 
+  // Only the owner can invite another admin. Admins can only invite
+  // roles strictly below their own level.
+  const roleLevel: Record<OrganizationRole, number> = {
+    owner: 4,
+    admin: 3,
+    manager: 2,
+    sales: 1,
+    viewer: 0,
+  };
+  const actorLevel = roleLevel[membership.role as OrganizationRole] ?? 0;
+  const targetLevel = roleLevel[role] ?? 0;
+  if (role === "owner" || actorLevel <= targetLevel) {
+    return { error: "You're not allowed to invite someone with that role." };
+  }
+
   if (!email.trim() || !email.includes("@")) {
     return { error: "Valid email is required." };
   }
@@ -746,7 +758,8 @@ export async function getTeamDashboardData(): Promise<TeamDashboardData> {
       .eq("is_read", false),
     supabase
       .from("organization_members")
-      .select("role"),
+      .select("role")
+      .eq("organization_id", orgId),
     supabase
       .from("prospects")
       .select("owner_id")

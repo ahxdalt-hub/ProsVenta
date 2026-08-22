@@ -10,8 +10,6 @@ import { SecuritySection } from "./sections/SecuritySection";
 import { AccessibilitySection } from "./sections/AccessibilitySection";
 import { AboutSection } from "./sections/AboutSection";
 import { SupportSection } from "./sections/SupportSection";
-import { BillingSection } from "./sections/BillingSection";
-import { IntegrationsSection } from "./sections/IntegrationsSection";
 import { IcpSection } from "./sections/IcpSection";
 import type { SettingsData } from "@/lib/db/settings";
 import type { Organization } from "@/types/database";
@@ -45,14 +43,6 @@ const SECTION_META: Record<SettingsSection, { title: string; description: string
   workspace: {
     title: "Workspace",
     description: "Update your organization and workspace details",
-  },
-  billing: {
-    title: "Billing",
-    description: "Manage your subscription, invoices, and payment methods",
-  },
-  integrations: {
-    title: "Integrations",
-    description: "Connect Prosventa to your favorite tools",
   },
   icp: {
     title: "Ideal Customer Profile",
@@ -106,10 +96,6 @@ export function SettingsShell({ data, organization, isOwner }: SettingsShellProp
             <WorkspaceSection organization={organization} isOwner={isOwner} />
           </Suspense>
         );
-      case "billing":
-        return <BillingSection organization={organization} isOwner={isOwner} />;
-      case "integrations":
-        return <IntegrationsSection />;
       case "icp":
         return <IcpSection />;
       case "accessibility":
