@@ -10,6 +10,7 @@ import type {
   RecommendationRecordInsert,
   RecommendationRecordUpdate,
 } from "@/features/intelligence/recommendations/types";
+import { rankRecommendations } from "@/features/intelligence/recommendations/lifecycle";
 
 // ============================================================================
 // Queries
@@ -120,11 +121,84 @@ export async function updateRecommendationStatus(
   status: RecommendationRecordUpdate["status"]
 ): Promise<boolean> {
   if (!status) return false;
+  return updateRecommendationStatusWithMetadata(id, { status });
+}
+
+/**
+ * Updates a recommendation with full lifecycle metadata (status transitions,
+ * viewed/accepted/dismissed timestamps, dismissal reason, feedback, freshness
+ * and supersede pointers). RLS ensures workspace scoping.
+ */
+export async function updateRecommendationStatusWithMetadata(
+  id: string,
+  updates: RecommendationRecordUpdate
+): Promise<boolean> {
   const supabase = await createClient();
   const { error } = await supabase
     .from("recommendations")
-    .update({ status, updated_at: new Date().toISOString() })
+    .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id);
 
   return !error;
+}
+
+/**
+ * Returns active (new/viewed) recommendations for a prospect, deterministically
+ * ranked by priority + confidence + evidence strength + freshness. RLS scopes
+ * to the caller's organization.
+ */
+export async function getActiveRankedRecommendations(
+  prospectId: string,
+  limit = 20
+): Promise<RecommendationRecord[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("recommendations")
+    .select("*")
+    .eq("prospect_id", prospectId)
+    .in("status", ["new", "viewed"])
+    .limit(100);
+
+  return rankRecommendations((data ?? []) as RecommendationRecord[]).slice(0, limit);
+}
+
+// ============================================================================
+// Decision Engine support — Feature 5 Phase 2
+// ============================================================================
+
+/**
+ * Returns ALL recommendations for a prospect regardless of status (recent
+ * first). Used by the decision engine for duplicate/dismissal/supersede
+ * evaluation — RLS scopes results to the caller's organization.
+ */
+export async function getAllRecommendationsForProspect(
+  prospectId: string,
+  limit = 100
+): Promise<RecommendationRecord[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("recommendations")
+    .select("*")
+    .eq("prospect_id", prospectId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  return (data ?? []) as RecommendationRecord[];
+}
+
+/**
+ * Clears the primary flag on every active recommendation of a prospect.
+ * Called inside the generation flow BEFORE marking a new primary so exactly
+ * one primary recommendation exists per prospect at any time.
+ */
+export async function clearPrimaryRecommendations(
+  prospectId: string
+): Promise<void> {
+  const supabase = await createClient();
+  await supabase
+    .from("recommendations")
+    .update({ primary_recommendation: false, updated_at: new Date().toISOString() })
+    .eq("prospect_id", prospectId)
+    .eq("primary_recommendation", true)
+    .in("status", ["new", "viewed"]);
 }

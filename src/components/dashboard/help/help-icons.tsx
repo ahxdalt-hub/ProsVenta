@@ -1,0 +1,136 @@
+// ============================================================================
+// Prosventa Help Center — Shared Icon Set
+// ============================================================================
+// Inline SVG icons in the same 1.75px-stroke style as the rest of the
+// dashboard icon system. Kept in one module so the Help Center and each
+// article detail page render identical category artwork (no emoji).
+// ============================================================================
+
+import type { HelpCategoryId } from "./help-content";
+
+const ICON_PROPS = {
+  className: "w-5 h-5",
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.75,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
+const ROUTES: Record<HelpCategoryId, React.ReactNode> = {
+  "getting-started": (
+    <svg {...ICON_PROPS}>
+      <circle cx="12" cy="12" r="10" />
+      <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+    </svg>
+  ),
+  prospects: (
+    <svg {...ICON_PROPS}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <line x1="19" y1="8" x2="19" y2="14" />
+      <line x1="22" y1="11" x2="16" y2="11" />
+    </svg>
+  ),
+  "saved-lists": (
+    <svg {...ICON_PROPS}>
+      <line x1="8" y1="6" x2="21" y2="6" />
+      <line x1="8" y1="12" x2="21" y2="12" />
+      <line x1="8" y1="18" x2="21" y2="18" />
+      <line x1="3" y1="6" x2="3.01" y2="6" />
+      <line x1="3" y1="12" x2="3.01" y2="12" />
+      <line x1="3" y1="18" x2="3.01" y2="18" />
+    </svg>
+  ),
+  import: (
+    <svg {...ICON_PROPS}>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="17 8 12 3 7 8" />
+      <line x1="12" y1="3" x2="12" y2="15" />
+    </svg>
+  ),
+  intelligence: (
+    <svg {...ICON_PROPS}>
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </svg>
+  ),
+  workspace: (
+    <svg {...ICON_PROPS}>
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <path d="M9 22v-4h6v4" />
+      <path d="M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01" />
+    </svg>
+  ),
+  settings: (
+    <svg {...ICON_PROPS}>
+      <line x1="4" y1="21" x2="4" y2="14" />
+      <line x1="4" y1="10" x2="4" y2="3" />
+      <line x1="12" y1="21" x2="12" y2="12" />
+      <line x1="12" y1="8" x2="12" y2="3" />
+      <line x1="20" y1="21" x2="20" y2="16" />
+      <line x1="20" y1="12" x2="20" y2="3" />
+      <line x1="1" y1="14" x2="7" y2="14" />
+      <line x1="9" y1="8" x2="15" y2="8" />
+      <line x1="17" y1="16" x2="23" y2="16" />
+    </svg>
+  ),
+};
+
+interface HelpCategoryIconProps {
+  category: HelpCategoryId;
+  className?: string;
+}
+
+/**
+ * Renders the stroke icon for a Help category. The icon is decorative, so it
+ * is hidden from assistive technology.
+ */
+export function HelpCategoryIcon({ category, className }: HelpCategoryIconProps) {
+  return (
+    <span className={className} aria-hidden="true">
+      {ROUTES[category]}
+    </span>
+  );
+}
+
+const SMALL = {
+  className: "w-4 h-4",
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
+/** Shared chevron used by the FAQ accordion. */
+export function ChevronDownIcon() {
+  return (
+    <svg {...SMALL}>
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
+
+/** Shared arrow-right used on "read more" links. */
+export function ArrowRightIcon() {
+  return (
+    <svg {...SMALL}>
+      <line x1="5" y1="12" x2="19" y2="12" />
+      <polyline points="12 5 19 12 12 19" />
+    </svg>
+  );
+}
+
+/** Search lens glyph used in the Help search field. */
+export function SearchGlyphIcon() {
+  return (
+    <svg {...SMALL}>
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}

@@ -18,6 +18,7 @@ import {
   dismissSuggestion,
   markSuggestionCreated,
 } from "@/lib/db/automation";
+import { EntitlementService } from "@/features/plans/service";
 import type {
   WorkflowInsert,
   WorkflowUpdate,
@@ -93,6 +94,34 @@ export async function toggleWorkflowAction(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  // Stage 8 Phase 6 — activating an automation is limited by the plan's
+  // max_active_automations entitlement (server-side; authoritative).
+  if (isActive) {
+    try {
+      const { data: workflow } = await supabase
+        .from("workflows")
+        .select("organization_id, is_active")
+        .eq("id", id)
+        .single();
+      if (workflow && !workflow.is_active) {
+        const decision = await EntitlementService.checkLimit(
+          workflow.organization_id,
+          "max_active_automations"
+        );
+        if (!decision.allowed) {
+          return {
+            error:
+              decision.errorCode === "FEATURE_NOT_INCLUDED"
+                ? "Your plan doesn't include active automations. View your plan to unlock them."
+                : `You've reached your plan limit (${decision.currentUsage} of ${decision.limitValue} active automations). Pause another automation or view your plan for more capacity.`,
+          };
+        }
+      }
+    } catch {
+      // Never block activation on entitlement infrastructure hiccups.
+    }
+  }
 
   const result = await updateWorkflow(id, { is_active: isActive });
   if (result.error) return { error: result.error };

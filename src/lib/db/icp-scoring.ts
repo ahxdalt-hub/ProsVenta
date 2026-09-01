@@ -118,3 +118,53 @@ export async function deleteProspectScore(id: string): Promise<boolean> {
     .eq("id", id);
   return !error;
 }
+
+// ============================================================================
+// Automatic Scoring Job States — Stage 5 Task 4
+// ============================================================================
+
+/**
+ * Returns the current automatic scoring job state for the given prospects.
+ * Reads the existing intelligence_jobs table (provider 'icp-scoring') —
+ * no new schema. Used to distinguish "Calculating…" from "Not scored" and
+ * from "Processing failed" in the UI.
+ *
+ * One batched query for a full page of prospects (no N+1). RLS scopes to
+ * the caller's organization.
+ */
+export async function getScoringJobStates(
+  prospectIds: string[]
+): Promise<Record<string, "pending" | "processing" | "failed">> {
+  const states: Record<string, "pending" | "processing" | "failed"> = {};
+  if (prospectIds.length === 0) return states;
+
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("intelligence_jobs")
+      .select("prospect_id, status")
+      .eq("provider", "icp-scoring")
+      .in("status", ["pending", "processing", "failed"])
+      .in("prospect_id", prospectIds);
+
+    for (const job of data ?? []) {
+      const id = job.prospect_id as string;
+      const status = job.status as string;
+      // Never overwrite an active state with a stale failure.
+      if (
+        !states[id] ||
+        status === "processing" ||
+        (status === "pending" && states[id] === "failed") ||
+        (status === "failed" && !states[id])
+      ) {
+        if (status === "pending" || status === "processing" || status === "failed") {
+          states[id] = status;
+        }
+      }
+    }
+  } catch {
+    // On error, treat all prospects as having no state ("Not scored").
+  }
+
+  return states;
+}

@@ -1,9 +1,10 @@
 // ============================================================================
-// Prosventa AI Assistant — Reusable Card Components
-// Stage 3 — Phase 8: AI-Powered Sales Workspace
+// Prosventa AI — Result Cards
 // ============================================================================
-// Reusable, memoized components for AI message presentation.
-// All components follow the Prosventa enterprise design language.
+// Memoized presentation components for assistant responses. Structured
+// business information is rendered as clean intelligence cards that reuse
+// the Prosventa design system — typography, radii, borders, shadows and
+// motion curves are shared with the rest of the dashboard.
 // ============================================================================
 
 "use client";
@@ -11,6 +12,7 @@
 import { memo } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { transitions } from "@/lib/motion";
 import type {
   AIProspectSummary,
   AISuggestion,
@@ -34,6 +36,16 @@ import {
 } from "./icons";
 
 // ============================================================================
+// Shared entrance transition — small fade + upward movement
+// ============================================================================
+
+const cardMotion = {
+  initial: { opacity: 0, y: 4 },
+  animate: { opacity: 1, y: 0 },
+  transition: transitions.base,
+} as const;
+
+// ============================================================================
 // Priority Badge
 // ============================================================================
 
@@ -49,7 +61,12 @@ export const PriorityBadge = memo(function PriorityBadge({ priority }: PriorityB
   };
 
   return (
-    <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide", styles[priority])}>
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+        styles[priority]
+      )}
+    >
       {priority}
     </span>
   );
@@ -71,11 +88,49 @@ export const SeverityBadge = memo(function SeverityBadge({ severity }: SeverityB
   };
 
   return (
-    <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide", styles[severity])}>
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+        styles[severity]
+      )}
+    >
       {severity}
     </span>
   );
 });
+
+// ============================================================================
+// Card Header — shared pattern for all intelligence cards
+// ============================================================================
+
+const CARD_ICON_STYLES: Record<string, string> = {
+  blue: "bg-blue-50 text-blue-600",
+  red: "bg-red-50 text-red-500",
+};
+
+function CardHeader({
+  icon,
+  tint,
+  title,
+}: {
+  icon: React.ReactNode;
+  tint: keyof typeof CARD_ICON_STYLES;
+  title: string;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className={cn(
+          "flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
+          CARD_ICON_STYLES[tint]
+        )}
+      >
+        {icon}
+      </span>
+      <p className="text-[13px] font-semibold tracking-tight text-slate-900">{title}</p>
+    </div>
+  );
+}
 
 // ============================================================================
 // Action Button
@@ -87,14 +142,14 @@ interface ActionButtonProps {
 }
 
 const ACTION_ICONS: Record<AIQuickActionType, React.ReactNode> = {
-  assign: <UserIcon className="w-3.5 h-3.5" />,
-  open_prospect: <BuildingIcon className="w-3.5 h-3.5" />,
-  schedule_followup: <CalendarIcon className="w-3.5 h-3.5" />,
-  create_task: <CheckIcon className="w-3.5 h-3.5" />,
-  mark_qualified: <TargetIcon className="w-3.5 h-3.5" />,
-  send_email: <MailIcon className="w-3.5 h-3.5" />,
-  call: <PhoneIcon className="w-3.5 h-3.5" />,
-  research: <SearchIcon className="w-3.5 h-3.5" />,
+  assign: <UserIcon className="h-3.5 w-3.5" />,
+  open_prospect: <BuildingIcon className="h-3.5 w-3.5" />,
+  schedule_followup: <CalendarIcon className="h-3.5 w-3.5" />,
+  create_task: <CheckIcon className="h-3.5 w-3.5" />,
+  mark_qualified: <TargetIcon className="h-3.5 w-3.5" />,
+  send_email: <MailIcon className="h-3.5 w-3.5" />,
+  call: <PhoneIcon className="h-3.5 w-3.5" />,
+  research: <SearchIcon className="h-3.5 w-3.5" />,
 };
 
 export const ActionButton = memo(function ActionButton({ action, onAction }: ActionButtonProps) {
@@ -102,7 +157,7 @@ export const ActionButton = memo(function ActionButton({ action, onAction }: Act
     <button
       onClick={() => onAction(action)}
       disabled={action.disabled}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-slate-600 disabled:hover:border-slate-200 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+      className="btn-press inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors duration-150 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-600"
       title={action.disabled ? "Select a prospect first" : action.label}
     >
       {ACTION_ICONS[action.type]}
@@ -120,11 +175,14 @@ interface QuickActionsRowProps {
   onAction: (action: AIQuickAction) => void;
 }
 
-export const QuickActionsRow = memo(function QuickActionsRow({ actions, onAction }: QuickActionsRowProps) {
+export const QuickActionsRow = memo(function QuickActionsRow({
+  actions,
+  onAction,
+}: QuickActionsRowProps) {
   if (!actions || actions.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-slate-100">
+    <div className="mt-1 flex flex-wrap gap-1.5">
       {actions.map((action) => (
         <ActionButton key={action.id} action={action} onAction={onAction} />
       ))}
@@ -141,7 +199,10 @@ interface SuggestionCardProps {
   onAction?: (action: AIQuickAction) => void;
 }
 
-export const SuggestionCard = memo(function SuggestionCard({ suggestion, onAction }: SuggestionCardProps) {
+export const SuggestionCard = memo(function SuggestionCard({
+  suggestion,
+  onAction,
+}: SuggestionCardProps) {
   const handleAction = () => {
     if (onAction && suggestion.action) {
       onAction({
@@ -155,26 +216,24 @@ export const SuggestionCard = memo(function SuggestionCard({ suggestion, onActio
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-      className="flex items-start gap-3 rounded-lg border border-slate-100 bg-slate-50/50 p-3"
+      {...cardMotion}
+      className="card-hover flex items-start gap-3 rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs"
     >
-      <span className="flex items-center justify-center w-6 h-6 rounded-md bg-blue-50 text-blue-600 shrink-0 mt-0.5">
-        <SparkleIcon className="w-3 h-3" />
+      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-600">
+        <SparkleIcon className="h-3 w-3" />
       </span>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-semibold text-slate-900">{suggestion.title}</p>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-[13px] font-semibold tracking-tight text-slate-900">
+            {suggestion.title}
+          </p>
           <PriorityBadge priority={suggestion.priority} />
         </div>
-        <p className="mt-0.5 text-xs text-slate-500 leading-relaxed">
-          {suggestion.description}
-        </p>
+        <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{suggestion.description}</p>
         {suggestion.action && onAction && (
           <button
             onClick={handleAction}
-            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline"
+            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-blue-600 transition-colors hover:text-blue-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
           >
             {suggestion.action.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())} →
           </button>
@@ -195,29 +254,25 @@ interface RiskCardProps {
 export const RiskCard = memo(function RiskCard({ risk }: RiskCardProps) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-      className="flex items-start gap-3 rounded-lg border border-red-50 bg-red-50/30 p-3"
+      {...cardMotion}
+      className="flex items-start gap-3 rounded-xl border border-red-100 bg-red-50/40 p-3"
     >
-      <span className="flex items-center justify-center w-6 h-6 rounded-md bg-red-50 text-red-500 shrink-0 mt-0.5">
-        <WarningIcon className="w-3 h-3" />
+      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-red-50 text-red-500">
+        <WarningIcon className="h-3 w-3" />
       </span>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-semibold text-slate-900">{risk.title}</p>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-[13px] font-semibold tracking-tight text-slate-900">{risk.title}</p>
           <SeverityBadge severity={risk.severity} />
         </div>
-        <p className="mt-0.5 text-xs text-slate-500 leading-relaxed">
-          {risk.description}
-        </p>
+        <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{risk.description}</p>
       </div>
     </motion.div>
   );
 });
 
 // ============================================================================
-// Summary Card
+// Prospect Overview Card — structured summary of a single prospect
 // ============================================================================
 
 interface SummaryCardProps {
@@ -227,37 +282,35 @@ interface SummaryCardProps {
 export const SummaryCard = memo(function SummaryCard({ summary }: SummaryCardProps) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-      className="rounded-lg border border-slate-100 bg-white p-3 space-y-3"
+      {...cardMotion}
+      className="space-y-3.5 rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs"
     >
-      <div className="flex items-center gap-2">
-        <span className="flex items-center justify-center w-6 h-6 rounded-md bg-blue-50 text-blue-600 shrink-0">
-          <BuildingIcon className="w-3 h-3" />
-        </span>
-        <p className="text-sm font-semibold text-slate-900">Company Overview</p>
-      </div>
-      <p className="text-xs text-slate-600 leading-relaxed">{summary.companyOverview}</p>
+      <CardHeader icon={<BuildingIcon className="h-3 w-3" />} tint="blue" title="Prospect overview" />
 
-      {summary.industry && (
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-medium text-slate-400 w-20 shrink-0">Industry</span>
-          <span className="text-xs text-slate-700 font-medium">{summary.industry}</span>
+      <p className="text-[13px] leading-relaxed text-slate-600">{summary.companyOverview}</p>
+
+      <dl className="space-y-2">
+        {summary.industry && (
+          <div className="flex items-baseline gap-3">
+            <dt className="w-24 shrink-0 text-[11px] font-medium text-slate-400">Industry</dt>
+            <dd className="text-xs font-medium text-slate-700">{summary.industry}</dd>
+          </div>
+        )}
+        <div className="flex items-baseline gap-3">
+          <dt className="w-24 shrink-0 text-[11px] font-medium text-slate-400">Lead quality</dt>
+          <dd className="text-xs font-medium text-slate-700">{summary.leadQuality}</dd>
         </div>
-      )}
-
-      <div className="flex items-center gap-2">
-        <span className="text-[11px] font-medium text-slate-400 w-20 shrink-0">Lead Quality</span>
-        <span className="text-xs text-slate-700 font-medium">{summary.leadQuality}</span>
-      </div>
+      </dl>
 
       {summary.importantNotes.length > 0 && (
         <div>
-          <p className="text-[11px] font-medium text-slate-400 mb-1.5">Important Notes</p>
+          <p className="mb-1.5 text-[11px] font-medium text-slate-400">Important notes</p>
           <div className="space-y-1.5">
             {summary.importantNotes.map((note, i) => (
-              <p key={i} className="text-xs text-slate-600 leading-relaxed pl-2 border-l-2 border-blue-100">
+              <p
+                key={i}
+                className="border-l-2 border-blue-100 pl-2.5 text-xs leading-relaxed text-slate-600"
+              >
                 {note}
               </p>
             ))}
@@ -266,13 +319,13 @@ export const SummaryCard = memo(function SummaryCard({ summary }: SummaryCardPro
       )}
 
       <div>
-        <p className="text-[11px] font-medium text-slate-400 mb-1">Recent Activity</p>
-        <p className="text-xs text-slate-600 leading-relaxed">{summary.recentActivity}</p>
+        <p className="mb-0.5 text-[11px] font-medium text-slate-400">Recent activity</p>
+        <p className="text-xs leading-relaxed text-slate-600">{summary.recentActivity}</p>
       </div>
 
-      <div className="rounded-lg bg-blue-50/50 border border-blue-100 p-2.5">
-        <p className="text-[11px] font-medium text-blue-600 mb-0.5">Suggested Next Step</p>
-        <p className="text-xs text-slate-700 leading-relaxed">{summary.suggestedNextStep}</p>
+      <div className="rounded-lg border border-blue-100 bg-blue-50/60 p-2.5">
+        <p className="mb-0.5 text-[11px] font-semibold text-blue-600">Suggested next step</p>
+        <p className="text-xs leading-relaxed text-slate-700">{summary.suggestedNextStep}</p>
       </div>
     </motion.div>
   );
@@ -289,28 +342,21 @@ interface TimelineCardProps {
 export const TimelineCard = memo(function TimelineCard({ timeline }: TimelineCardProps) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-      className="rounded-lg border border-slate-100 bg-white p-3 space-y-3"
+      {...cardMotion}
+      className="space-y-3 rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs"
     >
-      <div className="flex items-center gap-2">
-        <span className="flex items-center justify-center w-6 h-6 rounded-md bg-blue-50 text-blue-600 shrink-0">
-          <ClockIcon className="w-3 h-3" />
-        </span>
-        <p className="text-sm font-semibold text-slate-900">Activity Timeline</p>
-      </div>
+      <CardHeader icon={<ClockIcon className="h-3 w-3" />} tint="blue" title="Activity timeline" />
 
-      <p className="text-xs text-slate-600 leading-relaxed">{timeline.text}</p>
+      <p className="text-[13px] leading-relaxed text-slate-600">{timeline.text}</p>
 
       {timeline.events.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {timeline.events.slice(0, 5).map((event, i) => (
             <div key={i} className="flex items-start gap-2.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
+              <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400" />
               <div className="min-w-0">
-                <p className="text-xs text-slate-700 leading-relaxed">{event.description}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">
+                <p className="text-xs leading-relaxed text-slate-700">{event.description}</p>
+                <p className="mt-0.5 text-[10px] text-slate-400">
                   {new Date(event.date).toLocaleDateString("en-US", {
                     month: "short",
                     day: "numeric",
@@ -327,7 +373,7 @@ export const TimelineCard = memo(function TimelineCard({ timeline }: TimelineCar
 });
 
 // ============================================================================
-// Recommendation Card
+// Recommendation List
 // ============================================================================
 
 interface RecommendationCardProps {
@@ -335,7 +381,10 @@ interface RecommendationCardProps {
   onAction?: (action: AIQuickAction) => void;
 }
 
-export const RecommendationCard = memo(function RecommendationCard({ suggestions, onAction }: RecommendationCardProps) {
+export const RecommendationCard = memo(function RecommendationCard({
+  suggestions,
+  onAction,
+}: RecommendationCardProps) {
   if (!suggestions || suggestions.length === 0) return null;
 
   return (
@@ -348,7 +397,7 @@ export const RecommendationCard = memo(function RecommendationCard({ suggestions
 });
 
 // ============================================================================
-// Risk List Card
+// Risk List
 // ============================================================================
 
 interface RiskListCardProps {
@@ -368,7 +417,7 @@ export const RiskListCard = memo(function RiskListCard({ risks }: RiskListCardPr
 });
 
 // ============================================================================
-// Message Content Renderer
+// Message Content Renderer — lightweight markdown-ish formatting
 // ============================================================================
 
 interface MessageContentProps {
@@ -376,20 +425,22 @@ interface MessageContentProps {
 }
 
 export const MessageContent = memo(function MessageContent({ content }: MessageContentProps) {
-  // Simple markdown-ish rendering: bold, bullets, line breaks
-  const lines = content.split("\n");
+  // Split on line breaks (LF or CRLF) without inline escape sequences.
+  const lines = content.split(/\s*\r?\n\s*/);
 
   return (
     <div className="space-y-1.5">
       {lines.map((line, i) => {
-        if (line.trim() === "") return <div key={i} className="h-1" />;
+        if (line.trim() === "") return <div key={i} className="h-1.5" />;
 
         // Bullet point
         if (line.trim().startsWith("•")) {
           return (
             <div key={i} className="flex items-start gap-2">
-              <span className="w-1 h-1 rounded-full bg-blue-400 mt-1.5 shrink-0" />
-              <span className="text-xs text-slate-600 leading-relaxed">{renderInline(line.trim().slice(1).trim())}</span>
+              <span aria-hidden className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-blue-400" />
+              <span className="text-[13px] leading-relaxed text-slate-600">
+                {renderInline(line.trim().slice(1).trim())}
+              </span>
             </div>
           );
         }
@@ -399,14 +450,18 @@ export const MessageContent = memo(function MessageContent({ content }: MessageC
         if (numbered) {
           return (
             <div key={i} className="flex items-start gap-2">
-              <span className="text-[10px] font-bold text-blue-600 mt-0.5 shrink-0 w-4">{numbered[1]}.</span>
-              <span className="text-xs text-slate-600 leading-relaxed">{renderInline(numbered[2])}</span>
+              <span className="mt-px w-4 shrink-0 text-[11px] font-bold text-blue-600">
+                {numbered[1]}.
+              </span>
+              <span className="text-[13px] leading-relaxed text-slate-600">
+                {renderInline(numbered[2])}
+              </span>
             </div>
           );
         }
 
         return (
-          <p key={i} className="text-xs text-slate-600 leading-relaxed">
+          <p key={i} className="text-[13px] leading-relaxed text-slate-600">
             {renderInline(line)}
           </p>
         );

@@ -37,7 +37,10 @@ export type RecommendationType =
   | "complete_icp_data"
   // Follow-up Opportunity (only with legitimate evidence)
   | "review_recent_signal"
-  | "follow_up_company_event";
+  | "follow_up_company_event"
+  // Feature 5 Phase 1: reconsider a prospect whose underlying context changed
+  // (ICP updated, intelligence invalidated, material company/prospect change).
+  | "reassess_prospect";
 
 export const RECOMMENDATION_TYPES: RecommendationType[] = [
   "research_company",
@@ -71,38 +74,215 @@ export const RECOMMENDATION_TYPE_LABELS: Record<RecommendationType, string> = {
   complete_icp_data: "Complete ICP data",
   review_recent_signal: "Review recent signal",
   follow_up_company_event: "Follow up on company event",
+  reassess_prospect: "Reassess prospect",
+};
+
+/**
+ * Controlled category per recommendation type. Keeps the taxonomy small:
+ * priority / research / signal / data_quality / intelligence.
+ */
+export const RECOMMENDATION_TYPE_CATEGORIES: Record<RecommendationType, RecommendationCategory> = {
+  research_company: "research",
+  research_prospect: "research",
+  refresh_intelligence: "intelligence",
+  review_high_fit: "priority",
+  review_company_signal: "signal",
+  review_leadership_change: "signal",
+  review_company_context: "research",
+  review_prospect_role: "research",
+  investigate_business_need: "research",
+  verify_company_info: "data_quality",
+  verify_prospect_info: "data_quality",
+  complete_icp_data: "data_quality",
+  review_recent_signal: "signal",
+  follow_up_company_event: "signal",
+  reassess_prospect: "priority",
 };
 
 // ============================================================================
-// Priority
+// Priority — Feature 5 Phase 1: five-level scale.
+// Priority is derived from existing Intelligence scoring/evidence; it is
+// NEVER an arbitrary AI judgement. Confidence stays separate (below).
 // ============================================================================
-export type RecommendationPriority = "high" | "medium" | "low";
+export type RecommendationPriority = "very_high" | "high" | "medium" | "low" | "very_low";
 
-export const RECOMMENDATION_PRIORITIES: RecommendationPriority[] = ["high", "medium", "low"];
+export const RECOMMENDATION_PRIORITIES: RecommendationPriority[] = [
+  "very_high",
+  "high",
+  "medium",
+  "low",
+  "very_low",
+];
 
 export const RECOMMENDATION_PRIORITY_LABELS: Record<RecommendationPriority, string> = {
+  very_high: "Very High",
   high: "High",
   medium: "Medium",
   low: "Low",
+  very_low: "Very Low",
 };
 
+/** Numeric weight used ONLY for deterministic ranking (not user-facing). */
+export const RECOMMENDATION_PRIORITY_WEIGHTS: Record<RecommendationPriority, number> = {
+  very_high: 50,
+  high: 40,
+  medium: 30,
+  low: 20,
+  very_low: 10,
+};
+
+/** Maps the legacy three-level engine output onto the five-level scale. */
+export function expandLegacyPriority(priority: "high" | "medium" | "low"): RecommendationPriority {
+  return priority;
+}
+
 // ============================================================================
-// Status
+// Status — Feature 5 Phase 1 lifecycle.
+//
+//   new → viewed → accepted | dismissed
+//   new|viewed → expired      (deterministic TTL per type/category)
+//   any active state → superseded (invalidation; history is preserved)
+//
+// Legacy Stage-4 values ('reviewed', 'completed') remain valid so historical
+// rows keep rendering. They are treated as terminal, viewed-equivalent states.
 // ============================================================================
-export type RecommendationStatus = "new" | "reviewed" | "dismissed" | "completed";
+export type RecommendationStatus =
+  | "new"
+  | "viewed"
+  | "accepted"
+  | "dismissed"
+  | "expired"
+  | "superseded"
+  // Legacy values — readable, no longer produced by new generation flows.
+  | "reviewed"
+  | "completed";
 
 export const RECOMMENDATION_STATUSES: RecommendationStatus[] = [
   "new",
-  "reviewed",
+  "viewed",
+  "accepted",
   "dismissed",
-  "completed",
+  "expired",
+  "superseded",
 ];
+
+export const LEGACY_RECOMMENDATION_STATUSES: RecommendationStatus[] = ["reviewed", "completed"];
 
 export const RECOMMENDATION_STATUS_LABELS: Record<RecommendationStatus, string> = {
   new: "New",
-  reviewed: "Reviewed",
+  viewed: "Viewed",
+  accepted: "Accepted",
   dismissed: "Dismissed",
+  expired: "Expired",
+  superseded: "Superseded",
+  reviewed: "Reviewed",
   completed: "Completed",
+};
+
+/** States that still deserve the user's attention / appear in active lists. */
+export const ACTIVE_RECOMMENDATION_STATUSES: RecommendationStatus[] = ["new", "viewed"];
+
+/** States a recommendation can transition INTO from an active state. */
+export const TERMINAL_RECOMMENDATION_STATUSES: RecommendationStatus[] = [
+  "accepted",
+  "dismissed",
+  "expired",
+  "superseded",
+];
+
+/**
+ * Allowed deterministic status transitions. User actions and the expiry sweep
+ * both go through this — nothing else may change status.
+ */
+export const RECOMMENDATION_STATUS_TRANSITIONS: Record<RecommendationStatus, RecommendationStatus[]> = {
+  new: ["viewed", "accepted", "dismissed", "expired", "superseded"],
+  viewed: ["accepted", "dismissed", "expired", "superseded"],
+  accepted: ["superseded"],
+  dismissed: [],
+  expired: [],
+  superseded: [],
+  reviewed: ["completed", "superseded"],
+  completed: ["superseded"],
+};
+
+export function canTransitionStatus(
+  from: RecommendationStatus,
+  to: RecommendationStatus
+): boolean {
+  return (RECOMMENDATION_STATUS_TRANSITIONS[from] ?? []).includes(to);
+}
+
+// ============================================================================
+// Source — why this recommendation exists. Intelligence remains the primary
+// reasoning layer; 'signal', 'icp' and 'system' mark direct/deterministic
+// derivations.
+// ============================================================================
+export type RecommendationSourceType = "intelligence" | "signal" | "icp" | "system";
+
+export const RECOMMENDATION_SOURCE_TYPES: RecommendationSourceType[] = [
+  "intelligence",
+  "signal",
+  "icp",
+  "system",
+];
+
+export const RECOMMENDATION_SOURCE_LABELS: Record<RecommendationSourceType, string> = {
+  intelligence: "Intelligence",
+  signal: "Signal",
+  icp: "ICP",
+  system: "System",
+};
+
+// ============================================================================
+// Category — small, useful taxonomy grouping the controlled types.
+// ============================================================================
+export type RecommendationCategory =
+  | "priority"
+  | "research"
+  | "signal"
+  | "data_quality"
+  | "intelligence";
+
+export const RECOMMENDATION_CATEGORIES: RecommendationCategory[] = [
+  "priority",
+  "research",
+  "signal",
+  "data_quality",
+  "intelligence",
+];
+
+export const RECOMMENDATION_CATEGORY_LABELS: Record<RecommendationCategory, string> = {
+  priority: "Prioritize",
+  research: "Research",
+  signal: "Review signal",
+  data_quality: "Data quality",
+  intelligence: "Intelligence",
+};
+
+// ============================================================================
+// Dismissal reason — optional, lightweight feedback metadata.
+// ============================================================================
+export type RecommendationDismissalReason =
+  | "not_relevant"
+  | "already_handled"
+  | "incorrect"
+  | "not_interested"
+  | "other";
+
+export const RECOMMENDATION_DISMISSAL_REASONS: RecommendationDismissalReason[] = [
+  "not_relevant",
+  "already_handled",
+  "incorrect",
+  "not_interested",
+  "other",
+];
+
+export const RECOMMENDATION_DISMISSAL_REASON_LABELS: Record<RecommendationDismissalReason, string> = {
+  not_relevant: "Not relevant",
+  already_handled: "Already handled",
+  incorrect: "Incorrect",
+  not_interested: "Not interested",
+  other: "Other",
 };
 
 // ============================================================================
@@ -153,6 +333,26 @@ export interface RecommendationRecord {
   intelligence_updated_at: string | null;
   created_at: string;
   updated_at: string;
+  // --- Feature 5 Phase 1 foundation fields ---
+  recommendation_category?: RecommendationCategory | null;
+  source_type?: RecommendationSourceType | null;
+  /** Intelligence generation this recommendation is grounded in (reference only). */
+  intelligence_insight_id?: string | null;
+  expires_at?: string | null;
+  freshness?: "fresh" | "aging" | "stale" | "expired" | null;
+  superseded_by_id?: string | null;
+  viewed_at?: string | null;
+  accepted_at?: string | null;
+  dismissed_at?: string | null;
+  dismissal_reason?: RecommendationDismissalReason | null;
+  feedback?: string | null;
+  // --- Feature 5 Phase 2: decision engine ---
+  /** Exactly one active primary recommendation per prospect. */
+  primary_recommendation?: boolean | null;
+  /** Stable fingerprint of the underlying context that produced this rec. */
+  context_fingerprint?: string | null;
+  /** Which trigger produced this recommendation (observability). */
+  generation_trigger?: string | null;
 }
 
 export interface RecommendationRecordInsert {
@@ -171,6 +371,16 @@ export interface RecommendationRecordInsert {
   source_score_id?: string | null;
   dedupe_key: string;
   intelligence_updated_at?: string | null;
+  // --- Feature 5 Phase 1 foundation fields ---
+  recommendation_category?: RecommendationCategory | null;
+  source_type?: RecommendationSourceType | null;
+  intelligence_insight_id?: string | null;
+  expires_at?: string | null;
+  freshness?: "fresh" | "aging" | "stale" | "expired" | null;
+  // --- Feature 5 Phase 2: decision engine ---
+  primary_recommendation?: boolean | null;
+  context_fingerprint?: string | null;
+  generation_trigger?: string | null;
 }
 
 export interface RecommendationRecordUpdate {
@@ -183,6 +393,18 @@ export interface RecommendationRecordUpdate {
   confidence?: number;
   intelligence_updated_at?: string | null;
   updated_at?: string;
+  // --- Feature 5 Phase 1 foundation fields ---
+  freshness?: "fresh" | "aging" | "stale" | "expired" | null;
+  expires_at?: string | null;
+  superseded_by_id?: string | null;
+  viewed_at?: string | null;
+  accepted_at?: string | null;
+  dismissed_at?: string | null;
+  dismissal_reason?: RecommendationDismissalReason | null;
+  feedback?: string | null;
+  // --- Feature 5 Phase 2: decision engine ---
+  primary_recommendation?: boolean | null;
+  context_fingerprint?: string | null;
 }
 
 // ============================================================================
@@ -203,6 +425,11 @@ export interface RecommendationInput {
   dedupe_key: string;
   /** When the underlying intelligence was last refreshed */
   intelligence_updated_at?: string | null;
+  // --- Feature 5 Phase 1 foundation fields ---
+  /** Why this recommendation exists (Intelligence is the primary layer). */
+  source_type?: RecommendationSourceType;
+  /** Intelligence generation this recommendation is grounded in. */
+  intelligence_insight_id?: string | null;
 }
 
 // ============================================================================

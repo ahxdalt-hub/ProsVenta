@@ -8,6 +8,7 @@ import { CommandPalette } from "../search/CommandPalette";
 import { WorkspaceContent } from "@/components/loading/WorkspaceContent";
 import { transitions } from "@/lib/motion";
 import { useSidebarCollapse } from "./use-sidebar-collapse";
+import { useShellData } from "./ShellDataProvider";
 import { cn } from "@/lib/utils";
 import type { AIQuickAction } from "@/features/assistant";
 
@@ -40,6 +41,12 @@ export function DashboardShell({
   const searchOpenRef = useRef(false);
   const reduce = useReducedMotion();
   const { collapsed, toggle } = useSidebarCollapse();
+
+  // Shared identity source — Topbar/ProfileMenu read from here so avatar and
+  // name updates (Settings uploads) propagate to the shell without a reload.
+  const { data: shellData } = useShellData();
+  const identityName = shellData.userName ?? userName;
+  const identityAvatarUrl = shellData.avatarUrl;
 
   // Workspace entrance animation
   useEffect(() => {
@@ -110,8 +117,8 @@ export function DashboardShell({
         <Topbar
           workspaceName={workspaceName}
           userEmail={userEmail}
-          userName={userName}
-          avatarUrl={avatarUrl}
+          userName={identityName}
+          avatarUrl={identityAvatarUrl}
           jobRole={jobRole}
           onMenuOpen={() => setMobileOpen(true)}
           onSearchOpen={handleSearchOpen}

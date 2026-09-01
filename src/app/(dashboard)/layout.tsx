@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard/layout/DashboardShell";
+import { ShellDataProvider } from "@/components/dashboard/layout/ShellDataProvider";
 import { ThemeProvider } from "@/components/dashboard/settings/ThemeProvider";
 
 export default async function DashboardLayout({
@@ -55,15 +56,26 @@ export default async function DashboardLayout({
 
   return (
     <ThemeProvider initialReducedMotion={initialReducedMotion}>
-      <DashboardShell
-        workspaceName={workspaceName}
-        userEmail={userEmail}
-        userName={userName}
-        avatarUrl={avatarUrl}
-        jobRole={profile.job_role ?? null}
+      {/* Single shared identity source for the whole dashboard shell — the
+          layout re-renders on navigation so signed URLs stay fresh. */}
+      <ShellDataProvider
+        initialData={{
+          workspaceName,
+          userEmail,
+          userName,
+          avatarUrl,
+        }}
       >
-        {children}
-      </DashboardShell>
+        <DashboardShell
+          workspaceName={workspaceName}
+          userEmail={userEmail}
+          userName={userName}
+          avatarUrl={avatarUrl}
+          jobRole={profile.job_role ?? null}
+        >
+          {children}
+        </DashboardShell>
+      </ShellDataProvider>
     </ThemeProvider>
   );
 }

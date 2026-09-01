@@ -1,7 +1,7 @@
 import psycopg2
 import sys
 
-DB = dict(host='aws-0-ap-southeast-1.pooler.supabase.com', port=6543, dbname='postgres', user='postgres.fqznwnoesagaxrbyxdxx', password='shanusupabase', sslmode='require', connect_timeout=15)
+DB = dict(host='aws-0-ap-southeast-1.pooler.supabase.com', port=6543, dbname='postgres', user='postgres.fqznwnoesagaxrbyxdxx', password=__import__('os').environ.get('SUPABASE_DB_PASSWORD', ''), sslmode='require', connect_timeout=15)
 
 def main():
     if len(sys.argv) < 2:

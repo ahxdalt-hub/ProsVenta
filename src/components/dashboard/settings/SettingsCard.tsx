@@ -32,7 +32,6 @@ interface SettingsCardHeaderProps {
 
 /**
  * Settings card header with icon, title, description, and optional action.
- * Premium typography with clear hierarchy.
  */
 export function SettingsCardHeader({
   title,
@@ -73,13 +72,13 @@ export function SettingsCardHeader({
 interface SettingsRowProps {
   title: string;
   description?: string;
-  children: React.ReactNode;
+  /** Optional right-side action/control. Rows may be informational only. */
+  children?: React.ReactNode;
   className?: string;
 }
 
 /**
  * A settings row with title/description on the left and action on the right.
- * Improved typography with better contrast and line spacing.
  */
 export function SettingsRow({
   title,
@@ -103,17 +102,8 @@ export function SettingsRow({
 }
 
 /**
- * "Coming Soon" badge for future-ready features.
- * Clean, enterprise-grade pill with proper contrast.
+ * Subtle horizontal separator between rows or sections within a card.
  */
-export function ComingSoonBadge() {
-  return (
-    <span className="settings-badge-soon">
-      <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-      </svg>
-      Coming Soon
-    </span>
-  );
+export function SettingsDivider({ className = "" }: { className?: string }) {
+  return <hr className={cn("border-0 border-t border-slate-100 my-4", className)} />;
 }

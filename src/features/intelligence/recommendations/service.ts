@@ -31,18 +31,26 @@ import {
   getRecentRecommendationsForWorkspace,
   insertRecommendation,
   recommendationExists,
-  updateRecommendationStatus,
+  updateRecommendationStatusWithMetadata,
 } from "@/lib/db/recommendations";
 import { generateRecommendations } from "./engine";
 import { validateAndFilterRecommendations } from "./validate";
-import { triggerIntelligenceWorkflows } from "../workflows/service";
+import {
+  buildSupersedeUpdate,
+  computeExpiresAt,
+  computeFreshness,
+} from "./lifecycle";
+import { canTransitionStatus } from "./types";
 import type {
   RecommendationContext,
+  RecommendationDismissalReason,
   RecommendationOperationResult,
   RecommendationRecord,
   RecommendationRecordInsert,
+  RecommendationRecordUpdate,
   RecommendationSignalContext,
 } from "./types";
+import { RECOMMENDATION_TYPE_CATEGORIES } from "./types";
 
 // ============================================================================
 // Authorization Helper
@@ -292,30 +300,43 @@ export async function generateRecommendationsForProspect(
         source_score_id: rec.source_score_id ?? null,
         dedupe_key: rec.dedupe_key,
         intelligence_updated_at: rec.intelligence_updated_at ?? null,
+        // --- Feature 5 Phase 1 foundation fields ---
+        recommendation_category: RECOMMENDATION_TYPE_CATEGORIES[rec.recommendation_type],
+        source_type: rec.source_type ?? "intelligence",
+        intelligence_insight_id: rec.intelligence_insight_id ?? null,
+        freshness: computeFreshness(rec.intelligence_updated_at),
+        expires_at: computeExpiresAt(rec.recommendation_type),
       };
 
       const inserted = await insertRecommendation(record);
       if (inserted) {
         created++;
-        // Fire intelligence workflow triggers for new recommendations
-        await triggerIntelligenceWorkflows({
-          eventId: inserted.id,
-          triggerType: "recommendation_created",
-          organizationId: orgId,
-          prospectId,
-          prospectName: context.companyName,
-          recommendationId: inserted.id,
-          signalId: null,
-          scoreId: record.source_score_id ?? null,
-          context: {
-            icp_score: context.icpScore,
-            recommendation_priority: rec.priority,
-            recommendation_type: rec.recommendation_type,
-            company_name: context.companyName,
-            domain: context.domain,
-          },
-          occurredAt: new Date().toISOString(),
-        });
+        // Stage 7 Phase 2: recommendation.generated → trigger engine. This
+        // replaces the previous direct triggerIntelligenceWorkflows call so
+        // recommendation workflows run through the audited event pipeline
+        // (legacy `recommendation_created` workflows still match via the
+        // registry mapping). Loop protection lives in the trigger engine.
+        try {
+          const { safeEmitWorkflowEvent } = await import(
+            "@/features/intelligence/workflows/triggers/emit"
+          );
+          safeEmitWorkflowEvent({
+            eventType: "recommendation.generated",
+            organizationId: orgId,
+            targetType: "recommendation",
+            targetId: inserted.id,
+            payload: {
+              prospect_id: prospectId,
+              recommendation_id: inserted.id,
+              recommendation_type: rec.recommendation_type ?? null,
+              priority: rec.priority ?? null,
+              company_name: context.companyName ?? null,
+            },
+            dedupeKey: `recommendation.generated:${inserted.id}`,
+          });
+        } catch (err) {
+          console.error("[recommendations] Event emission failed:", err);
+        }
       }
     }
 
@@ -389,12 +410,35 @@ export async function getRecentRecommendationsForWorkspaceDisplay(
 }
 
 // ============================================================================
-// Status Operations
+// Status Operations — Feature 5 Phase 1 lifecycle
+// ============================================================================
+// All status changes go through the deterministic transition guard. No
+// external action is ever executed: "accept" only records that the user agrees
+// the recommendation is useful.
 // ============================================================================
 
+/** Loads a recommendation with org-ownership verification. */
+async function loadOwnedRecommendation(
+  recommendationId: string,
+  orgId: string
+): Promise<RecommendationRecord | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("recommendations")
+    .select("*")
+    .eq("id", recommendationId)
+    .single();
+
+  if (!data || (data as RecommendationRecord).organization_id !== orgId) {
+    return null;
+  }
+  return data as RecommendationRecord;
+}
+
 /**
- * Updates a recommendation's status (new/reviewed/dismissed/completed).
- * RLS ensures workspace scoping.
+ * Generic, transition-guarded status update for workspace members.
+ * Returns false when the recommendation does not exist in the caller's org or
+ * when the transition is not allowed by the lifecycle rules.
  */
 export async function updateRecommendationStatusForWorkspace(
   recommendationId: string,
@@ -402,19 +446,132 @@ export async function updateRecommendationStatusForWorkspace(
 ): Promise<boolean> {
   try {
     const { orgId } = await getOrgAndUser();
+    const recommendation = await loadOwnedRecommendation(recommendationId, orgId);
+    if (!recommendation) return false;
 
-    const supabase = await createClient();
-    const { data: recommendation } = await supabase
-      .from("recommendations")
-      .select("id, organization_id")
-      .eq("id", recommendationId)
-      .single();
+    if (!canTransitionStatus(recommendation.status, status)) return false;
 
-    if (!recommendation || recommendation.organization_id !== orgId) {
-      return false;
+    const updates: RecommendationRecordUpdate = { status };
+    if (status === "viewed" && !recommendation.viewed_at) {
+      updates.viewed_at = new Date().toISOString();
+    }
+    if (status === "accepted") {
+      updates.accepted_at = new Date().toISOString();
+      if (!recommendation.viewed_at) updates.viewed_at = new Date().toISOString();
+    }
+    if (status === "dismissed") {
+      updates.dismissed_at = new Date().toISOString();
     }
 
-    return await updateRecommendationStatus(recommendationId, status);
+    return await updateRecommendationStatusWithMetadata(recommendationId, updates);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Marks a recommendation as viewed (implicit on open). Idempotent — keeps the
+ * first viewed_at timestamp.
+ */
+export async function viewRecommendationForWorkspace(recommendationId: string): Promise<boolean> {
+  return updateRecommendationStatusForWorkspace(recommendationId, "viewed");
+}
+
+/**
+ * Accepts a recommendation: the user agrees it is useful. This does NOT execute
+ * any external workflow — execution belongs to the future Automation feature.
+ */
+export async function acceptRecommendationForWorkspace(recommendationId: string): Promise<boolean> {
+  return updateRecommendationStatusForWorkspace(recommendationId, "accepted");
+}
+
+/**
+ * Dismisses a recommendation with optional lightweight feedback metadata.
+ * The reason is never required — dismissal must stay one click.
+ */
+export async function dismissRecommendationForWorkspace(
+  recommendationId: string,
+  reason?: RecommendationDismissalReason,
+  feedback?: string
+): Promise<boolean> {
+  try {
+    const { orgId } = await getOrgAndUser();
+    const recommendation = await loadOwnedRecommendation(recommendationId, orgId);
+    if (!recommendation) return false;
+
+    if (!canTransitionStatus(recommendation.status, "dismissed")) return false;
+
+    return await updateRecommendationStatusWithMetadata(recommendationId, {
+      status: "dismissed",
+      dismissed_at: new Date().toISOString(),
+      ...(reason ? { dismissal_reason: reason } : {}),
+      ...(feedback && feedback.trim().length > 0 ? { feedback: feedback.trim() } : {}),
+    });
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Deterministic expiry sweep: transitions active recommendations whose
+ * expires_at has passed into 'expired'. NO AI calls — pure timestamp logic.
+ * Returns the number of expired recommendations.
+ */
+export async function expireStaleRecommendationsForWorkspace(): Promise<number> {
+  try {
+    const { orgId } = await getOrgAndUser();
+    const supabase = await createClient();
+
+    const { data: active } = await supabase
+      .from("recommendations")
+      .select("id, status, expires_at")
+      .eq("organization_id", orgId)
+      .in("status", ["new", "viewed"])
+      .not("expires_at", "is", null);
+
+    if (!active) return 0;
+
+    const now = Date.now();
+    let expiredCount = 0;
+    for (const row of active as Array<Pick<RecommendationRecord, "id" | "status" | "expires_at">>) {
+      if (!row.expires_at) continue;
+      const expiry = new Date(row.expires_at).getTime();
+      if (Number.isNaN(expiry) || now < expiry) continue;
+      if (!canTransitionStatus(row.status, "expired")) continue;
+
+      const ok = await updateRecommendationStatusWithMetadata(row.id, {
+        status: "expired",
+        freshness: "expired",
+      });
+      if (ok) expiredCount++;
+    }
+    return expiredCount;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Supersedes an old recommendation when newer evidence invalidates it.
+ * History is preserved: the old row remains with status 'superseded' and a
+ * pointer to the replacement — it is never deleted.
+ */
+export async function supersedeRecommendationForWorkspace(
+  oldRecommendationId: string,
+  newRecommendationId: string
+): Promise<boolean> {
+  try {
+    const { orgId } = await getOrgAndUser();
+    const [oldRec, newRec] = await Promise.all([
+      loadOwnedRecommendation(oldRecommendationId, orgId),
+      loadOwnedRecommendation(newRecommendationId, orgId),
+    ]);
+    if (!oldRec || !newRec) return false;
+
+    const update = buildSupersedeUpdate(newRecommendationId);
+    if (!canTransitionStatus(oldRec.status, update.status)) return false;
+
+    return await updateRecommendationStatusWithMetadata(oldRecommendationId, update);
   } catch {
     return false;
   }

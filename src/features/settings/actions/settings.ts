@@ -131,3 +131,28 @@ export async function updatePasswordAction(input: {
 
   return { error: null };
 }
+
+// ============================================================================
+// Sign out everywhere
+// ============================================================================
+
+/**
+ * Signs the user out of ALL sessions on ALL devices using the auth provider's
+ * global sign-out. This is a real, supported capability — no session faking.
+ * The user is redirected to login afterwards (their current session ends too).
+ */
+export async function signOutAllDevicesAction(): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+
+  const { error } = await supabase.auth.signOut({ scope: "global" });
+  if (error) {
+    return { error: "Could not sign out of all devices. Please try again." };
+  }
+
+  redirect("/login");
+}

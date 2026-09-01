@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
@@ -149,7 +150,9 @@ export function RecommendationSection({ prospectId }: RecommendationSectionProps
       {/* Empty State */}
       {!isLoadingCached && !isGenerating && recommendations.length === 0 && !hasError && (
         <p className="text-sm text-slate-400">
-          No recommended actions yet. Generate recommendations based on the intelligence available for this prospect.
+          No action is currently recommended for this prospect. Recommendations are
+          prioritized for stronger ICP matches, and more information may be needed
+          before Prosventa can suggest a useful next step.
         </p>
       )}
 
@@ -157,15 +160,21 @@ export function RecommendationSection({ prospectId }: RecommendationSectionProps
       {recommendations.length > 0 && !isGenerating && (
         <div className="space-y-2">
           {recommendations.map((recommendation) => (
-            <RecommendationCard
+            <motion.div
               key={recommendation.id}
-              recommendation={recommendation}
-              expanded={expandedId === recommendation.id}
-              onToggle={() => setExpandedId(expandedId === recommendation.id ? null : recommendation.id)}
-              onReviewed={() => handleStatusChange(recommendation.id, "reviewed")}
-              onDismissed={() => handleStatusChange(recommendation.id, "dismissed")}
-              onCompleted={() => handleStatusChange(recommendation.id, "completed")}
-            />
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <RecommendationCard
+                recommendation={recommendation}
+                expanded={expandedId === recommendation.id}
+                onToggle={() => setExpandedId(expandedId === recommendation.id ? null : recommendation.id)}
+                onReviewed={() => handleStatusChange(recommendation.id, "reviewed")}
+                onDismissed={() => handleStatusChange(recommendation.id, "dismissed")}
+                onCompleted={() => handleStatusChange(recommendation.id, "completed")}
+              />
+            </motion.div>
           ))}
         </div>
       )}

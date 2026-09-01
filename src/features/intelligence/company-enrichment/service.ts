@@ -29,6 +29,7 @@ import { IntelligenceError, toIntelligenceError } from "../errors";
 import {
   getCompanyEnrichmentProvider,
   getConfiguredProviderId,
+  resolveCompanyEnrichmentProviderId,
 } from "../providers/company-enrichment";
 import { registerMockProviderIfEnabled } from "../providers/mock";
 import { isMockProviderEnabled } from "../config";
@@ -123,18 +124,55 @@ async function trackUsage(
 // Provider Resolution
 // ============================================================================
 
-function resolveProvider(): { providerId: string; provider: IntelligenceProvider } {
+/**
+ * Resolves the provider for this organization via the Phase 1 architecture:
+ * organization_provider_configs → env fallback → registry lookup.
+ * Unknown/unconfigured ids throw PROVIDER_NOT_CONFIGURED honestly.
+ */
+async function resolveProvider(orgId: string): Promise<{ providerId: string; provider: IntelligenceProvider }> {
   // Ensure the dev mock provider is registered when explicitly enabled.
   registerMockProviderIfEnabled();
 
-  // Prefer the configured provider; fall back to the mock in development
-  // when enabled, otherwise the default "company-enrichment" id.
-  const providerId =
-    getConfiguredProviderId() ??
-    (isMockProviderEnabled() ? "mock" : "company-enrichment");
+  let providerId = await resolveCompanyEnrichmentProviderId(orgId);
+
+  // Development-only mock fallback: when no real provider is configured and
+  // the mock flag is explicitly enabled, use the clearly-labelled mock.
+  if (
+    providerId === "company-enrichment" &&
+    !getConfiguredProviderId() &&
+    isMockProviderEnabled()
+  ) {
+    providerId = "mock";
+  }
 
   const provider = getCompanyEnrichmentProvider(providerId);
   return { providerId, provider };
+}
+
+// ============================================================================
+// Intelligence Integration (Stage 6 - Phase 2, sections 11-13)
+// ============================================================================
+// After a successful enrichment, feed the stored company data back through the
+// EXISTING deterministic ICP scoring engine and its existing automatic
+// recommendation evaluation. This never creates a second scoring system and
+// never fails the enrichment operation itself.
+// ============================================================================
+
+async function rescoreAfterEnrichment(prospectId: string): Promise<void> {
+  try {
+    const { autoScoreNewProspects } = await import("../scoring/auto-score");
+    const result = await autoScoreNewProspects([prospectId]);
+    intelligenceLogger.info("post-enrichment re-scoring finished", {
+      operation: "company_enrichment",
+      target: prospectId,
+      status: result.scored > 0 ? "completed" : "skipped",
+      reason: result.reason ?? null,
+    });
+  } catch (error) {
+    // Re-scoring/recommendations are secondary — enrichment must succeed even
+    // if evaluation fails. The next explicit score run will pick up new data.
+    console.error("[company-enrichment] Post-enrichment re-scoring failed:", error);
+  }
 }
 
 // ============================================================================
@@ -204,8 +242,8 @@ export async function enrichCompanyForProspect(
       }
     }
 
-    // Resolve the provider (registers the dev mock when enabled).
-    const { providerId, provider } = resolveProvider();
+    // Resolve the provider for this organization (Phase 1 architecture).
+    const { providerId, provider } = await resolveProvider(orgId);
 
     // Duplicate prevention — never start a second identical job.
     const jobs = await getIntelligenceJobs(prospectId);
@@ -315,6 +353,12 @@ export async function enrichCompanyForProspect(
       completed_at: new Date().toISOString(),
     });
     await trackUsage(orgId, userId, providerId, "completed");
+
+    // Stage 6 - Phase 2: feed the stored company data back through the
+    // existing ICP scoring engine + recommendation evaluation. Fire-and-forget:
+    // never fails or delays the enrichment result returned to the UI.
+    await rescoreAfterEnrichment(prospectId);
+
     intelligenceLogger.info("company enrichment completed", {
       operation: "company_enrichment",
       provider: providerId,
@@ -412,6 +456,10 @@ export interface CompanyEnrichmentRecordLike {
   raw: Record<string, unknown> | null;
   confidence: number | null;
   enriched_at: string | null;
+  /** When this prospect/domain was FIRST enriched (provenance anchor) */
+  first_retrieved_at?: string | null;
+  /** When the stored data was last refreshed */
+  last_retrieved_at?: string | null;
   created_at: string;
   updated_at: string;
 }

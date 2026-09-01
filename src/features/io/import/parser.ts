@@ -211,7 +211,6 @@ export async function parseFile(file: File): Promise<ParsedFile | null> {
   const text = new TextDecoder("utf-8").decode(buffer);
 
   let rawRows: string[][];
-  let headers: string[];
 
   if (extension === "csv") {
     rawRows = parseCSV(text);
@@ -235,7 +234,7 @@ export async function parseFile(file: File): Promise<ParsedFile | null> {
     throw new Error("The file must contain at least a header row and one data row.");
   }
 
-  headers = rawRows[0].map((h) => sanitizeValue(h));
+  const headers: string[] = rawRows[0].map((h) => sanitizeValue(h));
   const missingHeaders = headers.filter((h) => !h);
   if (missingHeaders.length > 0) {
     throw new Error("One or more columns are missing a header name.");
@@ -248,6 +247,7 @@ export async function parseFile(file: File): Promise<ParsedFile | null> {
   const rows: Record<string, string>[] = [];
   const seenValues = new Set<string>();
   let duplicateCount = 0;
+  const duplicateSample: string[] = [];
 
   for (let i = 1; i < rawRows.length; i++) {
     const rawRow = rawRows[i];
@@ -266,6 +266,7 @@ export async function parseFile(file: File): Promise<ParsedFile | null> {
 
     if (dedupeKey && seenValues.has(dedupeKey)) {
       duplicateCount++;
+      if (duplicateSample.length < 5) duplicateSample.push(dedupeKey);
       continue;
     }
     if (dedupeKey) {
@@ -289,6 +290,8 @@ export async function parseFile(file: File): Promise<ParsedFile | null> {
     headers,
     rows,
     totalRows: rows.length,
+    duplicateCount,
+    duplicateSample,
   };
 }
 

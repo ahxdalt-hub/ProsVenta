@@ -1,6 +1,8 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getSignedAvatarUrls } from "@/lib/db/profiles";
+import { EntitlementService } from "@/features/plans/service";
 import type {
   ProspectComment,
   ActivityEvent,
@@ -301,12 +303,29 @@ export async function getActivityFeed(limit = 50): Promise<(ActivityEvent & { ac
 
   const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
 
+  // Avatars live in a private bucket — swap storage paths for short-lived
+  // signed URLs so actor avatars render instead of silently 403-ing.
+  const signedUrls = await getSignedAvatarUrls(
+    events.map((e) => {
+      const actor = profileMap.get(e.actor_id);
+      return { userId: e.actor_id, avatarPath: actor?.avatar_url ?? null };
+    }),
+    user.id
+  );
+  const signedByUrl = new Map<string, string | null>();
+  events.forEach((e, i) => signedByUrl.set(e.actor_id, signedUrls[i] ?? null));
+
   return events.map((event) => {
     const actor = profileMap.get(event.actor_id);
     return {
       ...(event as ActivityEvent),
       actor: actor
-        ? { full_name: actor.full_name, avatar_url: actor.avatar_url }
+        ? {
+            full_name: actor.full_name,
+            avatar_url: actor.avatar_url
+              ? (signedByUrl.get(actor.id) ?? null)
+              : null,
+          }
         : null,
     };
   });
@@ -505,6 +524,35 @@ export async function createInvitation(email: string, role: OrganizationRole): P
 
   if (!email.trim() || !email.includes("@")) {
     return { error: "Valid email is required." };
+  }
+
+  // Stage 8 Phase 6 — server-side plan limit enforcement (authoritative).
+  // Pending invitations count toward the limit too, so a plan can never be
+  // bypassed by stacking invitations ahead of acceptances.
+  try {
+    // Seats used = current members + pending invitations. Requesting one more
+    // seat must stay within max_team_members.
+    const { count: pendingInvites } = await supabase
+      .from("organization_invitations")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", membership.organization_id)
+      .is("accepted_at", null);
+    const usage = await EntitlementService.getUsage(membership.organization_id);
+    const seatsUsed = usage.teamMembers + (pendingInvites ?? 0);
+    const entitlement = await EntitlementService.getEntitlement(
+      membership.organization_id,
+      "max_team_members"
+    );
+    const limitValue =
+      entitlement?.limit_type === "integer" ? entitlement.value : null;
+    if (limitValue !== null && seatsUsed + 1 > limitValue) {
+      return {
+        error: `You've reached your plan limit (${seatsUsed} of ${limitValue} team members, including pending invitations). View your plan to add more seats.`,
+      };
+    }
+  } catch {
+    // Never block invitations on entitlement infrastructure hiccups — the
+    // role checks above remain authoritative for authorization.
   }
 
   // Check if the user is already a member

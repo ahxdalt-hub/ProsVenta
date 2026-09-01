@@ -14,6 +14,8 @@ export interface SettingsData {
   > | null;
   settings: UserSettings | null;
   email: string | null;
+  /** Whether the auth provider has confirmed the user's email address. */
+  emailConfirmed: boolean;
 }
 
 // ============================================================================
@@ -31,7 +33,7 @@ export async function getSettingsData(): Promise<SettingsData> {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { profile: null, settings: null, email: null };
+    return { profile: null, settings: null, email: null, emailConfirmed: false };
   }
 
   const [{ data: profile }, { data: settings }] = await Promise.all([
@@ -47,6 +49,13 @@ export async function getSettingsData(): Promise<SettingsData> {
       .single(),
   ]);
 
+  // Real verification status from the auth provider — never assumed.
+  const emailConfirmed =
+    typeof user.email_confirmed_at === "string" ||
+    typeof user.confirmed_at === "string"
+      ? true
+      : false;
+
   // If the user has an avatar stored in the private bucket, generate a signed URL
   let avatarUrl: string | null = null;
   if (profile?.avatar_url) {
@@ -60,6 +69,7 @@ export async function getSettingsData(): Promise<SettingsData> {
     profile: profile ? { ...profile, avatar_url: avatarUrl } : null,
     settings,
     email: user.email ?? null,
+    emailConfirmed,
   };
 }
 

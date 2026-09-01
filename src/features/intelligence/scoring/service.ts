@@ -1,9 +1,9 @@
-// ============================================================================
-// Prosventa Smart Lead & ICP Scoring — Service
-// Stage 4 — Phase 6: Smart Lead & ICP Scoring
+﻿// ============================================================================
+// Prosventa Smart Lead & ICP Scoring â€” Service
+// Stage 4 â€” Phase 6: Smart Lead & ICP Scoring
 // ============================================================================
 // Server-side boundary for ICP scoring operations. UI components never call
-// the scoring engine directly — they go through this service.
+// the scoring engine directly â€” they go through this service.
 //
 // Authorization is resolved server-side from the authenticated user's
 // organization membership. The client-supplied prospectId is never trusted
@@ -17,10 +17,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { IntelligenceError, toIntelligenceError } from "../errors";
 import { getIcpConfiguration, getProspectScore, upsertProspectScore } from "@/lib/db/icp-scoring";
-import { getCompanyEnrichment, getProspectEnrichment, recordIntelligenceUsage } from "@/lib/db/intelligence";
-import { getCompanyResearch } from "@/lib/db/company-research";
-import { getProspectResearch } from "@/lib/db/prospect-research";
-import { normalizeDomain } from "../domain";
+import { recordIntelligenceUsage } from "@/lib/db/intelligence";
+import { buildScoringContext } from "./context";
 import { scoreProspectAgainstIcp } from "./engine";
 import { assertValidIcpCriteria } from "./icp-validation";
 import { SCORING_VERSION, type ProspectScore, type ScoreOperationResult } from "./types";
@@ -43,107 +41,6 @@ async function getOrgAndUser(): Promise<{ orgId: string; userId: string }> {
   if (!membership) throw new IntelligenceError("AUTHENTICATION_FAILED");
 
   return { orgId: membership.organization_id, userId: user.id };
-}
-
-// ============================================================================
-// Context Builder
-// ============================================================================
-// Gathers available prospect + company data from existing Prosventa data.
-// Uses the strongest available information. Does NOT call external providers.
-// ============================================================================
-
-async function buildScoringContext(prospectId: string, orgId: string) {
-  const supabase = await createClient();
-
-  // Resolve the prospect server-side to verify workspace authorization.
-  const { data: prospect } = await supabase
-    .from("prospects")
-    .select(
-      "id, organization_id, company_name, name, website, domain, industry, description, employee_count, city, country, location, contact_name, contact_email"
-    )
-    .eq("id", prospectId)
-    .single();
-
-  if (!prospect) {
-    throw new IntelligenceError("NOT_FOUND");
-  }
-
-  // Verify the prospect belongs to the authenticated user's org.
-  if (prospect.organization_id !== orgId) {
-    throw new IntelligenceError("AUTHENTICATION_FAILED");
-  }
-
-  const domain = normalizeDomain(prospect.domain || prospect.website) ?? null;
-
-  // Load company enrichment data when available.
-  let companyEnrichment: Record<string, unknown> | null = null;
-  let hasCompanyEnrichment = false;
-  if (domain) {
-    const enrichmentRecord = await getCompanyEnrichment(prospectId, domain);
-    if (enrichmentRecord?.status === "completed" && enrichmentRecord.data) {
-      companyEnrichment = enrichmentRecord.data as unknown as Record<string, unknown>;
-      hasCompanyEnrichment = true;
-    }
-  }
-
-  // Load prospect enrichment data when available.
-  let prospectEnrichment: Record<string, unknown> | null = null;
-  let hasProspectEnrichment = false;
-  const prospectEnrichmentRecord = await getProspectEnrichment(prospectId);
-  if (prospectEnrichmentRecord?.status === "completed" && prospectEnrichmentRecord.data) {
-    prospectEnrichment = prospectEnrichmentRecord.data as unknown as Record<string, unknown>;
-    hasProspectEnrichment = true;
-  }
-
-  // Load company research when available.
-  let hasCompanyResearch = false;
-  if (domain) {
-    const researchRecord = await getCompanyResearch(prospectId, domain);
-    if (researchRecord?.status === "completed" && researchRecord.result) {
-      hasCompanyResearch = true;
-    }
-  }
-
-  // Load prospect research when available.
-  let hasProspectResearch = false;
-  const prospectResearchRecord = await getProspectResearch(prospectId);
-  if (prospectResearchRecord?.status === "completed" && prospectResearchRecord.result) {
-    hasProspectResearch = true;
-  }
-
-  // Derive company data
-  const company = {
-    industry: prospect.industry || (companyEnrichment?.industry as string | null) || null,
-    employeeCount: prospect.employee_count ?? (companyEnrichment?.employeeCount as number | null) ?? null,
-    employeeRange: (companyEnrichment?.employeeRange as string | null) || null,
-    country: prospect.country || (companyEnrichment?.country as string | null) || null,
-    companyType: (companyEnrichment?.companyType as string | null) || null,
-    technologies: Array.isArray(companyEnrichment?.technologies)
-      ? (companyEnrichment.technologies as string[])
-      : [],
-    businessModel: (companyEnrichment?.businessModel as string | null) || null,
-  };
-
-  // Derive prospect data
-  const prospectData = {
-    jobTitle: (prospectEnrichment?.jobTitle as string | null) || null,
-    department: (prospectEnrichment?.department as string | null) || null,
-    seniority: (prospectEnrichment?.seniority as string | null) || null,
-    location: prospect.location || (prospectEnrichment?.location as string | null) || null,
-    country: prospect.country || (prospectEnrichment?.country as string | null) || null,
-    city: prospect.city || (prospectEnrichment?.city as string | null) || null,
-  };
-
-  return {
-    prospectId,
-    organizationId: orgId,
-    company,
-    prospect: prospectData,
-    hasCompanyEnrichment,
-    hasProspectEnrichment,
-    hasCompanyResearch,
-    hasProspectResearch,
-  };
 }
 
 // ============================================================================
@@ -204,7 +101,7 @@ export async function scoreProspectForWorkspace(
       return { status: "failed", message: "You do not have access to this prospect.", score: null };
     }
 
-    // Cache check — do not re-score on every page load.
+    // Cache check â€” do not re-score on every page load.
     if (!options?.refresh) {
       const existing = await getProspectScore(prospectId);
       if (existing) {
@@ -234,7 +131,7 @@ export async function scoreProspectForWorkspace(
       };
     }
 
-    // Track usage — one explicit user action produces one scoring operation.
+    // Track usage â€” one explicit user action produces one scoring operation.
     await trackUsage(orgId, userId, "pending");
 
     // Build the scoring context from available data.
@@ -242,6 +139,10 @@ export async function scoreProspectForWorkspace(
 
     // Run the deterministic scoring engine.
     const result = scoreProspectAgainstIcp(context, criteria);
+
+    // Capture the previous score BEFORE the upsert overwrites it, so we can
+    // detect real score changes for prospect.score.updated.
+    const previousScoreRecord = options?.refresh ? await getProspectScore(prospectId) : null;
 
     // Persist the validated score.
     const record = await upsertProspectScore({
@@ -259,6 +160,54 @@ export async function scoreProspectForWorkspace(
     });
 
     await trackUsage(orgId, userId, "completed");
+
+    // Stage 7 Phase 2: prospect.score.updated — ONLY when the score actually
+    // changed. Never emits meaningless 84 → 84 events.
+    if (record) {
+      try {
+        const changed =
+          previousScoreRecord === null || previousScoreRecord.score !== record.score;
+        if (changed) {
+          const { safeEmitWorkflowEvent } = await import(
+            "@/features/intelligence/workflows/triggers/emit"
+          );
+          safeEmitWorkflowEvent({
+            eventType: "prospect.score.updated",
+            organizationId: orgId,
+            targetType: "prospect",
+            targetId: prospectId,
+            payload: {
+              prospect_id: prospectId,
+              previous_score: previousScoreRecord?.score ?? null,
+              new_score: record.score,
+              score_category: record.category,
+            },
+            dedupeKey: `prospect.score.updated:${prospectId}:${record.score}:${record.scored_at ?? ""}`,
+          });
+        }
+      } catch (err) {
+        console.error("[scoring] Score-change event emission failed:", err);
+      }
+    }
+
+    // Stage 5 Task 2: automatic recommendation evaluation for strong/excellent
+    // fits. Secondary operation — never fails or blocks the scoring result.
+    if (record) {
+      try {
+        const { autoGenerateRecommendations, RECOMMENDATION_TRIGGER_SCORE } = await import(
+          "@/features/intelligence/recommendations/auto-recommendations"
+        );
+        const qualifies =
+          record.score >= RECOMMENDATION_TRIGGER_SCORE ||
+          record.category === "strong" ||
+          record.category === "excellent";
+        if (qualifies) {
+          await autoGenerateRecommendations([prospectId]);
+        }
+      } catch (recError) {
+        console.error("[scoring] Automatic recommendation evaluation failed:", recError);
+      }
+    }
 
     return {
       status: "completed",

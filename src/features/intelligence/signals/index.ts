@@ -4,6 +4,10 @@
 // ============================================================================
 
 export * from "./types";
+export * from "./registry";
+export * from "./lifecycle";
+export * from "./evidence";
+export * from "./query-filters";
 export * from "./dedupe";
 export * from "./internal-engine";
 export * from "./provider";

@@ -26,3 +26,34 @@ export function getConfiguredProviderId(): string | null {
   const configured = process.env.INTELLIGENCE_COMPANY_PROVIDER;
   return configured && configured.trim() ? configured.trim() : null;
 }
+
+/**
+ * Resolves the company enrichment provider id for a specific organization
+ * using the Stage 6 - Phase 1 architecture:
+ *
+ *   1. Per-organization provider selection (`organization_provider_configs`,
+ *      kind = "company_enrichment") — non-secret, RLS-scoped.
+ *   2. Server-side environment fallback (`INTELLIGENCE_COMPANY_PROVIDER`).
+ *
+ * The returned id is only an identifier — the actual adapter must be
+ * registered in the intelligence registry. An id with no registered adapter
+ * (e.g. "clearbit" without credentials/adapter) results in an honest
+ * PROVIDER_NOT_CONFIGURED error at resolution time; data is never fabricated.
+ */
+export async function resolveCompanyEnrichmentProviderId(orgId: string): Promise<string> {
+  // 1. Organization-level selection (Phase 1 foundation)
+  if (orgId) {
+    try {
+      const { getOrganizationProviderConfig } = await import("@/lib/db/intelligence");
+      const orgConfig = await getOrganizationProviderConfig(orgId, "company_enrichment");
+      if (orgConfig && orgConfig.enabled && orgConfig.provider_id.trim()) {
+        return orgConfig.provider_id.trim();
+      }
+    } catch {
+      // Org config is optional — fall through to environment configuration.
+    }
+  }
+
+  // 2. Environment-level selection
+  return getConfiguredProviderId() ?? "company-enrichment";
+}

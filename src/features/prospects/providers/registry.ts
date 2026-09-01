@@ -34,3 +34,36 @@ class ProspectProviderRegistry implements ProviderRegistry {
  * Providers register once at module load time.
  */
 export const providerRegistry: ProviderRegistry = new ProspectProviderRegistry();
+
+// ============================================================================
+// Prosventa Lead Provider Accessor (server-only)
+// Stage 2 — Phase 8: Real Lead Discovery
+// ============================================================================
+// Resolves the active lead discovery provider for server-side services.
+// Lead providers implement the richer paginated LeadDiscoveryProvider
+// contract and are tracked separately from legacy ProspectProvider entries.
+// Registration is lazy so provider modules (and their env reads) never run
+// in a client bundle. Replace or add providers here — nothing upstream changes.
+// ============================================================================
+
+import { ApolloLeadProvider, APOLLO_PROVIDER_ID } from "./apollo";
+import type { LeadDiscoveryProvider } from "./types";
+
+const leadProviders = new Map<string, LeadDiscoveryProvider>();
+let registered = false;
+
+function ensureRegistered(): void {
+  if (registered) return;
+  const apollo = new ApolloLeadProvider();
+  leadProviders.set(apollo.getConfig().id, apollo);
+  registered = true;
+}
+
+/**
+ * Returns the active lead discovery provider, or null when none is
+ * configured. The caller decides how to surface PROVIDER_NOT_CONFIGURED.
+ */
+export function getActiveLeadProvider(): LeadDiscoveryProvider | null {
+  ensureRegistered();
+  return leadProviders.get(APOLLO_PROVIDER_ID) ?? null;
+}

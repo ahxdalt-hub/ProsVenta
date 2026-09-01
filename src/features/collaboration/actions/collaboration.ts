@@ -146,7 +146,7 @@ export async function createInvitationAction(
   const result = await createInvitation(email, role);
   if (result.error) return { error: result.error };
 
-  revalidatePath("/dashboard/organization/members");
+  revalidatePath("/dashboard/organization");
   return { error: null };
 }
 
@@ -160,7 +160,7 @@ export async function resendInvitationAction(
   const result = await resendInvitation(invitationId);
   if (result.error) return { error: result.error };
 
-  revalidatePath("/dashboard/organization/members");
+  revalidatePath("/dashboard/organization");
   return { error: null };
 }
 
@@ -174,7 +174,7 @@ export async function revokeInvitationAction(
   const result = await revokeInvitation(invitationId);
   if (result.error) return { error: result.error };
 
-  revalidatePath("/dashboard/organization/members");
+  revalidatePath("/dashboard/organization");
   return { error: null };
 }
 
@@ -188,6 +188,6 @@ export async function deleteInvitationAction(
   const ok = await deleteInvitation(invitationId);
   if (!ok) return { error: "Could not delete invitation." };
 
-  revalidatePath("/dashboard/organization/members");
+  revalidatePath("/dashboard/organization");
   return { error: null };
 }

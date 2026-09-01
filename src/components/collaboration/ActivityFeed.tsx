@@ -1,7 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import { cn } from "@/lib/utils";
+import { Avatar } from "@/components/ui/Avatar";
 import type { ActivityEvent } from "@/types/database";
 
 interface ActivityFeedProps {
@@ -9,28 +9,6 @@ interface ActivityFeedProps {
     actor: { full_name: string | null; avatar_url: string | null } | null;
   })[];
   limit?: number;
-}
-
-function getInitials(name: string | null | undefined): string {
-  if (!name) return "?";
-  const words = name.trim().split(/\s+/);
-  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
-  return name.slice(0, 2).toUpperCase();
-}
-
-function getAvatarColor(name: string | null | undefined): string {
-  const colors = [
-    "bg-blue-100 text-blue-700",
-    "bg-green-100 text-green-700",
-    "bg-amber-100 text-amber-700",
-    "bg-purple-100 text-purple-700",
-    "bg-pink-100 text-pink-700",
-    "bg-indigo-100 text-indigo-700",
-    "bg-teal-100 text-teal-700",
-    "bg-orange-100 text-orange-700",
-  ];
-  const hash = (name ?? "").split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return colors[hash % colors.length];
 }
 
 function formatTimestamp(dateString: string): string {
@@ -107,19 +85,17 @@ function getActionIcon(action: string) {
 
 const ActivityItem = memo(function ActivityItem({ event }: { event: ActivityFeedProps["events"][number] }) {
   const actorName = event.actor?.full_name ?? "Unknown user";
-  const initials = getInitials(event.actor?.full_name);
   const entityName = event.entity_name;
 
   return (
     <div className="flex gap-3 py-3">
       {/* Actor avatar */}
-      <div className={cn("flex items-center justify-center w-8 h-8 rounded-full shrink-0", getAvatarColor(event.actor?.full_name ?? "?"))}>
-        {event.actor?.avatar_url ? (
-          <img src={event.actor.avatar_url} alt={actorName} className="w-full h-full rounded-full object-cover" />
-        ) : (
-          <span className="text-xs font-semibold">{initials}</span>
-        )}
-      </div>
+      <Avatar
+        src={event.actor?.avatar_url}
+        name={event.actor?.full_name}
+        size="sm"
+        className="shrink-0"
+      />
 
       {/* Content */}
       <div className="flex-1 min-w-0">

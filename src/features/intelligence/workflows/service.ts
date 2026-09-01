@@ -174,6 +174,22 @@ async function executeSafeAction(
 }
 
 // ============================================================================
+// Orchestrator bridge — Stage 7 Phase 4
+// ============================================================================
+// The automation orchestrator REUSES this service's action executor so there is
+// exactly ONE action execution path in Prosventa. No logic is duplicated.
+export async function executeOrchestratedAction(
+  action: IntelligenceAction,
+  event: IntelligenceTriggerEvent,
+  orgId: string,
+  userId: string,
+  executionId: string,
+  workflowId: string
+): Promise<{ success: boolean; output: Record<string, unknown>; error?: string }> {
+  return executeSafeAction(action, event, orgId, userId, executionId, workflowId);
+}
+
+// ============================================================================
 // Main Execution Trigger
 // ============================================================================
 
@@ -182,7 +198,8 @@ async function executeSafeAction(
  * Enforces idempotency, evaluates conditions, and executes safe actions.
  */
 export async function triggerIntelligenceWorkflows(
-  event: IntelligenceTriggerEvent
+  event: IntelligenceTriggerEvent,
+  workflowsOverride?: IntelligenceWorkflow[]
 ): Promise<ExecutionResult[]> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -190,8 +207,9 @@ export async function triggerIntelligenceWorkflows(
 
   const results: ExecutionResult[] = [];
 
-  // Load active workflows matching this trigger type
-  const workflows = await getActiveWorkflowsForTrigger(event.triggerType, event.organizationId);
+  // Load active workflows matching this trigger type (or use the pre-matched
+  // set provided by the Stage 7 trigger engine).
+  const workflows = workflowsOverride ?? await getActiveWorkflowsForTrigger(event.triggerType, event.organizationId);
 
   for (const workflow of workflows) {
     const triggerEventId = buildTriggerEventId(event.triggerType, event.eventId);

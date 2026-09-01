@@ -124,6 +124,7 @@ export type IntelligenceExecutionStatus =
   | "running"
   | "waiting_approval"
   | "completed"
+  | "partially_completed"
   | "failed"
   | "cancelled"
   | "skipped";
@@ -133,6 +134,7 @@ export const INTELLIGENCE_EXECUTION_STATUS_LABELS: Record<IntelligenceExecutionS
   running: "Running",
   waiting_approval: "Waiting Approval",
   completed: "Completed",
+  partially_completed: "Partially Completed",
   failed: "Failed",
   cancelled: "Cancelled",
   skipped: "Skipped",
@@ -141,7 +143,14 @@ export const INTELLIGENCE_EXECUTION_STATUS_LABELS: Record<IntelligenceExecutionS
 // ============================================================================
 // Action Execution Status
 // ============================================================================
-export type ActionExecutionStatus = "pending" | "running" | "completed" | "failed" | "skipped" | "cancelled";
+export type ActionExecutionStatus =
+  | "pending"
+  | "running"
+  | "waiting_approval"
+  | "completed"
+  | "failed"
+  | "skipped"
+  | "cancelled";
 
 // ============================================================================
 // Trigger Event (the intelligence event that fires a workflow)
@@ -174,9 +183,80 @@ export interface IntelligenceTriggerEvent {
 // ============================================================================
 export interface IntelligenceCondition {
   field: IntelligenceConditionField;
-  operator: "equals" | "not_equals" | "greater_than" | "less_than" | "is_set" | "is_not_set";
+  operator:
+    | "equals"
+    | "not_equals"
+    | "greater_than"
+    | "greater_than_or_equal"
+    | "less_than"
+    | "less_than_or_equal"
+    | "contains"
+    | "not_contains"
+    | "is_set"
+    | "is_not_set";
   value: string | number | null;
 }
+
+// ============================================================================
+// Condition Group (Stage 7 Phase 1 — structured AND/OR groups)
+// ============================================================================
+// A group combines its conditions with an explicit logical mode. Multiple
+// groups on a workflow are combined with AND. Only ONE nesting level is
+// supported — groups cannot contain groups. This keeps evaluation predictable.
+// ============================================================================
+
+export type ConditionGroupMode = "all" | "any";
+
+export interface IntelligenceConditionGroup {
+  mode: ConditionGroupMode;
+  conditions: IntelligenceCondition[];
+}
+
+/** Normalizes legacy flat condition arrays and group arrays into groups. */
+export function normalizeConditionGroups(
+  conditions: unknown[] | null | undefined,
+  groups: unknown[] | null | undefined
+): IntelligenceConditionGroup[] {
+  const result: IntelligenceConditionGroup[] = [];
+  if (conditions && conditions.length > 0) {
+    result.push({ mode: "all", conditions: conditions as IntelligenceCondition[] });
+  }
+  if (groups) {
+    for (const g of groups as IntelligenceConditionGroup[]) {
+      if (g && Array.isArray(g.conditions)) {
+        result.push({ mode: g.mode === "any" ? "any" : "all", conditions: g.conditions });
+      }
+    }
+  }
+  return result;
+}
+
+// ============================================================================
+// Structured Error Categories (Stage 7 Phase 1)
+// ============================================================================
+// Meaningful, client-safe failure categories. Stack traces are never exposed.
+// ============================================================================
+
+export type WorkflowErrorCode =
+  | "validation_error"
+  | "not_found"
+  | "permission_denied"
+  | "provider_unavailable"
+  | "capability_unsupported"
+  | "limit_exceeded"
+  | "internal_error"
+  | "cancelled";
+
+export const WORKFLOW_ERROR_LABELS: Record<WorkflowErrorCode, string> = {
+  validation_error: "Validation Error",
+  not_found: "Not Found",
+  permission_denied: "Permission Denied",
+  provider_unavailable: "Provider Unavailable",
+  capability_unsupported: "Capability Unsupported",
+  limit_exceeded: "Limit Exceeded",
+  internal_error: "Internal Error",
+  cancelled: "Cancelled",
+};
 
 // ============================================================================
 // Intelligence Action
@@ -193,9 +273,15 @@ export interface IntelligenceWorkflowDefinition {
   trigger_type: IntelligenceTriggerType;
   trigger_config: Record<string, unknown>;
   conditions: IntelligenceCondition[];
+  /** Structured condition groups (Stage 7). Combined with AND; each group uses all/any. */
+  condition_groups?: IntelligenceConditionGroup[] | null;
   actions: IntelligenceAction[];
   requires_approval: boolean;
   max_executions_per_event: number;
+  /** Safety valve — maximum total executions. NULL = unlimited. */
+  execution_limit?: number | null;
+  /** Safety valve — maximum actions executed per single execution. */
+  max_actions_per_execution?: number | null;
 }
 
 // ============================================================================

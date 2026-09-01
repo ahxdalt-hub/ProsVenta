@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { updateProspectStatus, updateProspect, createProspect, deleteProspect } from "@/lib/db/prospects";
 import { createProspectNote, deleteProspectNote } from "@/lib/db/notes";
-import { addToList, removeFromList } from "@/lib/db/lists";
+import { removeFromList, addToListMany } from "@/lib/db/lists";
+import { EntitlementService } from "@/features/plans/service";
 import type { ProspectPriority, ProspectStatus } from "@/types/database";
 
 // ============================================================================
@@ -26,6 +27,9 @@ export async function createProspectAction(
     location?: string;
     description?: string;
     employee_count?: number;
+    contact_name?: string;
+    contact_email?: string;
+    contact_phone?: string;
   }
 ): Promise<{ error: string | null; id?: string }> {
   const supabase = await createClient();
@@ -40,13 +44,32 @@ export async function createProspectAction(
   }
 
   const { data: membership } = await supabase
-    .from("organization_members")
-    .select("organization_id")
-    .eq("user_id", user.id)
-    .single();
+      .from("organization_members")
+      .select("organization_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
 
-  if (!membership) {
-    return { error: "You are not a member of an organization." };
+    if (!membership) {
+      return { error: "You are not a member of an organization." };
+    }
+
+  // Stage 8 Phase 6 — server-side plan limit enforcement (authoritative).
+  try {
+    const decision = await EntitlementService.checkLimit(
+      membership.organization_id,
+      "max_prospects"
+    );
+    if (!decision.allowed) {
+      return {
+        error:
+          decision.errorCode === "FEATURE_NOT_INCLUDED"
+            ? "Your plan doesn't include prospect management. Upgrade your plan to add prospects."
+            : `You've reached your plan limit (${decision.currentUsage} of ${decision.limitValue} prospects). View your plan to get more capacity.`,
+      };
+    }
+  } catch {
+    // Entitlement resolution must never block core CRUD on infrastructure
+    // hiccups — RLS + DB constraints remain authoritative.
   }
 
   try {
@@ -61,6 +84,9 @@ export async function createProspectAction(
       location: input.location?.trim() || null,
       description: input.description?.trim() || null,
       employee_count: input.employee_count ?? null,
+      contact_name: input.contact_name?.trim() || null,
+      contact_email: input.contact_email?.trim() || null,
+      contact_phone: input.contact_phone?.trim() || null,
       source: "manual",
       status: "new",
     });
@@ -69,11 +95,86 @@ export async function createProspectAction(
       return { error: "Failed to create prospect." };
     }
 
+    // Stage 5 Task 4: automatic intelligence processing. Secondary operation —
+    // a scoring failure must never prevent the prospect from being created.
+    // The job is queued synchronously (cheap) and executed after this request
+    // responds via Next.js `after()` — no blocking intelligence work.
+    try {
+      const { queueIntelligenceProcessing, runIntelligencePipeline } = await import(
+        "@/features/intelligence/pipeline"
+      );
+      const { after } = await import("next/server");
+      const queuedIds = await queueIntelligenceProcessing([prospect.id], {
+        trigger: "prospect_created",
+      });
+      if (queuedIds.length > 0) {
+        after(async () => {
+          await runIntelligencePipeline(queuedIds);
+        });
+      }
+    } catch (scoringError) {
+      console.error("[createProspectAction] Intelligence queueing failed:", scoringError);
+    }
+
     revalidatePath("/dashboard/prospects");
     return { error: null, id: prospect.id };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Failed to create prospect.",
+    };
+  }
+}
+
+/**
+ * Retries automatic intelligence processing for a prospect whose scoring
+ * previously failed. Uses the existing pipeline queue — idempotent and
+ * org-scoped via RLS. Processing runs after the request responds.
+ */
+export async function retryIntelligenceAction(
+  prospectId: string
+): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+
+  try {
+    const { queueIntelligenceProcessing, runIntelligencePipeline } = await import(
+      "@/features/intelligence/pipeline"
+    );
+    const { after } = await import("next/server");
+
+    // Verify the prospect belongs to the user's organization before queueing.
+        const { data: membership } = await supabase
+          .from("organization_members")
+          .select("organization_id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (!membership) return { error: "You are not a member of an organization." };
+
+    const { data: prospect } = await supabase
+      .from("prospects")
+      .select("id, organization_id")
+      .eq("id", prospectId)
+      .single();
+    if (!prospect || prospect.organization_id !== membership.organization_id) {
+      return { error: "Prospect not found." };
+    }
+
+    const queuedIds = await queueIntelligenceProcessing([prospectId]);
+    if (queuedIds.length > 0) {
+      after(async () => {
+        await runIntelligencePipeline(queuedIds);
+      });
+    }
+
+    revalidatePath("/dashboard/prospects");
+    return { error: null };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Failed to retry intelligence processing.",
     };
   }
 }
@@ -300,6 +401,23 @@ export async function saveProspectToList(
   listId: string,
   prospectId: string
 ): Promise<{ error: string | null }> {
+  if (!listId || !prospectId) {
+    return { error: "Could not save prospect to list." };
+  }
+  const result = await saveProspectsToListAction(listId, [prospectId]);
+  return { error: result.error };
+}
+
+/**
+ * Adds MULTIPLE prospects to a saved list in ONE round trip (Phase 6).
+ * Idempotent — already-member prospects are skipped, never duplicated
+ * (unique_list_prospect + upsert ignoreDuplicates are the final protection).
+ * RLS ensures both the list and prospects belong to the user's organization.
+ */
+export async function saveProspectsToListAction(
+  listId: string,
+  prospectIds: string[]
+): Promise<{ error: string | null; added: number }> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -307,16 +425,28 @@ export async function saveProspectToList(
 
   if (!user) redirect("/login");
 
+  if (!listId || prospectIds.length === 0) {
+    return { error: "Nothing to save.", added: 0 };
+  }
+
   try {
-    const item = await addToList({ list_id: listId, prospect_id: prospectId });
-    if (!item) {
-      return { error: "Could not save prospect to list." };
+    const ok = await addToListMany(listId, prospectIds);
+    if (!ok) {
+      return { error: "Could not save prospects to list.", added: 0 };
     }
-    revalidatePath(`/dashboard/prospects/${prospectId}`);
-    return { error: null };
+    revalidatePath(`/dashboard/saved-lists/${listId}`);
+    revalidatePath("/dashboard/saved-lists");
+    for (const prospectId of prospectIds) {
+      revalidatePath(`/dashboard/prospects/${prospectId}`);
+    }
+    return { error: null, added: prospectIds.length };
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : "Failed to save prospect to list.",
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to save prospects to list.",
+      added: 0,
     };
   }
 }

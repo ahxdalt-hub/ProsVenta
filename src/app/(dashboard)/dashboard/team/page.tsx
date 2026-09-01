@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ensureOrganization, getOrganizationDetails, getOrganizationMembers } from "@/lib/db/organizations";
 import { getTeamDashboardData, getActivityFeed } from "@/lib/db/collaboration";
 import { Card, CardHeader } from "@/components/ui/Card";
+import { Avatar } from "@/components/ui/Avatar";
 import { ActivityFeed } from "@/components/collaboration/ActivityFeed";
 import { RoleBadge } from "@/components/collaboration/RoleBadge";
 import { Badge } from "@/components/ui/Badge";
@@ -90,17 +91,14 @@ export default async function TeamDashboardPage() {
                   {members.map((member) => {
                     const isCurrentUser = member.user_id === user.id;
                     const name = member.profile.full_name || "Unknown";
-                    const initials = (name.split(" ").map((n) => n[0]).join("").slice(0, 2)).toUpperCase();
                     const assignedCount = teamData.assignedByMember.find((a) => a.user_id === member.user_id)?.count ?? 0;
                     return (
                       <div key={member.id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 hover:border-slate-300 transition-colors duration-150">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center shrink-0">
-                          {member.profile.avatar_url ? (
-                            <img src={member.profile.avatar_url} alt={name} className="w-full h-full rounded-full object-cover" />
-                          ) : (
-                            <span className="text-sm font-semibold text-slate-600">{initials}</span>
-                          )}
-                        </div>
+                        <Avatar
+                          src={member.profile.avatar_url}
+                          name={name}
+                          size="lg"
+                        />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-semibold text-slate-900 truncate">{name}</p>

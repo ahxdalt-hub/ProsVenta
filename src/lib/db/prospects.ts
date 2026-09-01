@@ -8,6 +8,8 @@ import type {
   ProspectUpdate,
   ProspectNote,
 } from "@/types/database";
+import type { ProspectScore } from "@/features/intelligence/scoring/types";
+import { getProspectScore } from "./icp-scoring";
 import type {
   ProspectFilters,
   ProspectPage,
@@ -17,6 +19,24 @@ import type {
 
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 50;
+
+// ============================================================================
+// Stage 7 Phase 2 — Trigger & Event Engine producer helper
+// ============================================================================
+// Fire-and-forget event emission. Dynamic import avoids circular dependencies;
+// failures are logged and swallowed — prospect CRUD must never break because
+// of the workflow trigger engine.
+// ============================================================================
+type ProspectEventInput = Parameters<
+  typeof import("@/features/intelligence/workflows/triggers/emit").safeEmitWorkflowEvent
+>[0];
+
+function emitProspectEventSafe(input: ProspectEventInput): void {
+  import("@/features/intelligence/workflows/triggers/emit")
+    .then(({ safeEmitWorkflowEvent }) => safeEmitWorkflowEvent(input))
+    .catch((err) => console.error("[prospects] Event emission failed:", err));
+}
+
 
 /**
  * Retrieves all prospects for the authenticated user's organization.
@@ -40,11 +60,29 @@ export async function getProspects(): Promise<Prospect[]> {
 export async function getProspect(id: string): Promise<Prospect | null> {
   const supabase = await createClient();
 
-  const { data: prospect } = await supabase
+  const { data: prospect, error } = await supabase
     .from("prospects")
     .select("*")
     .eq("id", id)
     .single();
+
+  // DEV-ONLY diagnostics (Phase 2 recovery): surface WHY a detail lookup came
+  // back empty instead of collapsing every failure into "not found".
+  //   no error + row       → Case A (normal)
+  //   PGRST116 "no rows"   → Case B (genuinely absent) OR Case C (RLS hid it)
+  //   any other code       → Case D (query failed)
+  // Never logs tokens or credentials.
+  if (process.env.NODE_ENV === "development") {
+    console.log(
+      "[DB-PROSPECT] detail lookup:",
+      JSON.stringify({
+        prospectId: id,
+        found: Boolean(prospect),
+        errorCode: error?.code ?? null,
+        errorMessage: error?.message ?? null,
+      })
+    );
+  }
 
   return prospect;
 }
@@ -76,12 +114,22 @@ export async function queryProspects(
   const sortField = query.sort ?? "created_at";
   const sortOrder = query.order ?? "desc";
 
-  // Build the base query with filters
+  // ICP Score lives in prospect_scores (one-to-one via unique prospect_id).
+  // Embed it in the same request so there is no N+1 pattern, and sort on the
+  // stored numeric score. Unscored prospects always group after scored ones.
+  const isIcpSort = sortField === ("icp_score" as ProspectSortField);
   let dbQuery = supabase
     .from("prospects")
-    .select("*", { count: "exact" })
-    .order(sortField, { ascending: sortOrder === "asc" })
-    .range(from, to);
+    .select("*, prospect_scores(score, category)", { count: "exact" });
+
+  if (isIcpSort) {
+    dbQuery = dbQuery
+      .order("prospect_scores(score)", { ascending: sortOrder === "asc", nullsFirst: false })
+      .order("created_at", { ascending: false });
+  } else {
+    dbQuery = dbQuery.order(sortField, { ascending: sortOrder === "asc" });
+  }
+  dbQuery = dbQuery.range(from, to);
 
   // Apply filters
   if (query.status) {
@@ -195,26 +243,80 @@ export async function queryProspects(
 
   // Apply search across name, company, industry, location, website, tags
   if (query.search && query.search.trim()) {
-    const term = `%${query.search.trim()}%`;
+    const raw = query.search.trim();
+    // PostgREST's .or() uses a comma-delimited grammar — a search term
+    // containing , ( ) " would corrupt the filter string and make the whole
+    // query fail. Strip those characters from the ilike patterns.
+    const term = `%${raw.replace(/[,()"]/g, " ").trim()}%`;
+    const tagTerm = raw.replace(/[,()"]/g, "");
     dbQuery = dbQuery.or(
-      `name.ilike.${term},company_name.ilike.${term},industry.ilike.${term},location.ilike.${term},website.ilike.${term},city.ilike.${term},country.ilike.${term},contact_name.ilike.${term},contact_email.ilike.${term},tags.cs.${query.search.trim()}`
+      `name.ilike.${term},company_name.ilike.${term},industry.ilike.${term},location.ilike.${term},website.ilike.${term},domain.ilike.${term},city.ilike.${term},country.ilike.${term},contact_name.ilike.${term},contact_email.ilike.${term}${tagTerm ? `,tags.cs.${tagTerm}` : ""}`
     );
   }
 
   // Apply advanced filter builder conditions
   if (query.conditions && query.conditions.length > 0) {
     for (const condition of query.conditions) {
-      applyFilterCondition(dbQuery as any, condition);
+      applyFilterCondition(dbQuery, condition);
     }
   }
 
-  const { data: prospects, count } = await dbQuery;
+  const { data: prospects, count, error: prospectsError } = await dbQuery;
+
+  // Surface real query failures (RLS issues, bad filters, outages) to the page
+  // shell so the user sees an explicit error state instead of an empty table.
+  if (prospectsError) {
+    throw new Error(prospectsError.message);
+  }
+
+  // Normalize the embedded prospect_scores relationship: PostgREST may return
+  // an object (one-to-one) or a single-element array depending on how the
+  // unique constraint is detected. The UI expects an object.
+  const normalized = (prospects ?? []).map((p: Record<string, unknown>) => {
+    const embedded = p.prospect_scores;
+    if (Array.isArray(embedded)) {
+      return { ...p, prospect_scores: embedded[0] ?? null };
+    }
+    return p;
+  });
+
+  // Attach active-recommendation hints for the current page in ONE batched
+  // query (RLS-scoped). This is a per-page query, never a per-row N+1 loop,
+  // and a failure here must not break the prospects listing itself.
+  const pageIds = normalized.map((p) => (p as Record<string, unknown>).id as string).filter(Boolean);
+  let recsByProspect = new Map<string, { recommendation_type: string; priority: "high" | "medium" | "low" }[]>();
+  if (pageIds.length > 0) {
+    try {
+      const supabaseForRecs = await createClient();
+      const { data: recs } = await supabaseForRecs
+        .from("recommendations")
+        .select("prospect_id, recommendation_type, priority")
+        .in("prospect_id", pageIds)
+        .neq("status", "dismissed")
+        .order("created_at", { ascending: false });
+      for (const rec of (recs ?? []) as { prospect_id: string; recommendation_type: string; priority: "high" | "medium" | "low" }[]) {
+        const list = recsByProspect.get(rec.prospect_id) ?? [];
+        if (list.length < 5) {
+          list.push({ recommendation_type: rec.recommendation_type, priority: rec.priority });
+          recsByProspect.set(rec.prospect_id, list);
+        }
+      }
+    } catch {
+      // Recommendations are an enhancement — absence must not fail the table.
+      recsByProspect = new Map();
+    }
+  }
+
+  const withRecommendations = normalized.map((p) => {
+    const id = (p as Record<string, unknown>).id as string;
+    return { ...p, active_recommendations: recsByProspect.get(id) ?? [] };
+  });
 
   const total = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return {
-    prospects: prospects ?? [],
+    prospects: withRecommendations as never[],
     total,
     page,
     pageSize,
@@ -223,10 +325,29 @@ export async function queryProspects(
 }
 
 /**
+ * Structural view of the subset of the Supabase PostgREST filter builder used
+ * by the advanced filter engine. Filter methods mutate the builder in place
+ * (they return `this`), so callers never need the return value.
+ */
+interface FilterableProspectQuery {
+  contains(column: string, value: unknown): unknown;
+  eq(column: string, value: unknown): unknown;
+  neq(column: string, value: unknown): unknown;
+  not(column: string, operator: string, value: unknown): unknown;
+  ilike(column: string, value: string): unknown;
+  gt(column: string, value: unknown): unknown;
+  gte(column: string, value: unknown): unknown;
+  lt(column: string, value: unknown): unknown;
+  lte(column: string, value: unknown): unknown;
+  in(column: string, values: unknown[]): unknown;
+  overlaps(column: string, values: unknown[]): unknown;
+}
+
+/**
  * Applies a single filter builder condition to the Supabase query.
  */
 function applyFilterCondition(
-  dbQuery: any,
+  dbQuery: FilterableProspectQuery,
   condition: { field: string; operator: string; value: string | number | boolean }
 ): void {
   const { field, operator, value } = condition;
@@ -256,44 +377,44 @@ function applyFilterCondition(
   switch (operator) {
     case "is":
       if (column === "tags") {
-        dbQuery = dbQuery.contains(column, [value]);
+        dbQuery.contains(column, [value]);
       } else {
-        dbQuery = dbQuery.eq(column, value);
+        dbQuery.eq(column, value);
       }
       break;
     case "is_not":
       if (column === "tags") {
-        dbQuery = dbQuery.not(column, "cs", `{${value}}`);
+        dbQuery.not(column, "cs", `{${value}}`);
       } else {
-        dbQuery = dbQuery.neq(column, value);
+        dbQuery.neq(column, value);
       }
       break;
     case "contains":
-      dbQuery = dbQuery.ilike(column, `%${value}%`);
+      dbQuery.ilike(column, `%${value}%`);
       break;
     case "does_not_contain":
-      dbQuery = dbQuery.not(column, "ilike", `%${value}%`);
+      dbQuery.not(column, "ilike", `%${value}%`);
       break;
     case "gt":
-      dbQuery = dbQuery.gt(column, value);
+      dbQuery.gt(column, value);
       break;
     case "gte":
-      dbQuery = dbQuery.gte(column, value);
+      dbQuery.gte(column, value);
       break;
     case "lt":
-      dbQuery = dbQuery.lt(column, value);
+      dbQuery.lt(column, value);
       break;
     case "lte":
-      dbQuery = dbQuery.lte(column, value);
+      dbQuery.lte(column, value);
       break;
     case "eq":
-      dbQuery = dbQuery.eq(column, value);
+      dbQuery.eq(column, value);
       break;
     case "is_one_of":
       if (typeof value === "string" && value.includes(",")) {
         const values = value.split(",").filter(Boolean);
         if (values.length > 0) {
-          dbQuery = dbQuery.in(column, values);
+          dbQuery.in(column, values);
         }
       }
       break;
@@ -301,7 +422,7 @@ function applyFilterCondition(
       if (typeof value === "string" && value.includes(",")) {
         const values = value.split(",").filter(Boolean);
         if (values.length > 0) {
-          dbQuery = dbQuery.not(column, "in", `(${values.join(",")})`);
+          dbQuery.not(column, "in", `(${values.join(",")})`);
         }
       }
       break;
@@ -309,18 +430,18 @@ function applyFilterCondition(
       if (typeof value === "string" && value.includes(",")) {
         const values = value.split(",").filter(Boolean);
         if (values.length > 0) {
-          dbQuery = dbQuery.overlaps(column, values);
+          dbQuery.overlaps(column, values);
         }
       }
       break;
     case "exists":
-      dbQuery = dbQuery.not(column, "is", null);
+      dbQuery.not(column, "is", null);
       break;
     case "before":
-      dbQuery = dbQuery.lte(column, String(value));
+      dbQuery.lte(column, String(value));
       break;
     case "after":
-      dbQuery = dbQuery.gte(column, String(value));
+      dbQuery.gte(column, String(value));
       break;
   }
 }
@@ -452,6 +573,23 @@ export async function createProspect(
     .select()
     .single();
 
+  // Stage 7 Phase 2: prospect.created → trigger engine. Fire-and-forget —
+  // prospect creation must never block or fail because of workflow triggers.
+  if (prospect) {
+    emitProspectEventSafe({
+      eventType: "prospect.created",
+      organizationId: prospect.organization_id,
+      targetType: "prospect",
+      targetId: prospect.id,
+      payload: {
+        prospect_id: prospect.id,
+        source: prospect.source ?? null,
+        created_at: prospect.created_at ?? new Date().toISOString(),
+      },
+      dedupeKey: `prospect.created:${prospect.id}`,
+    });
+  }
+
   return prospect;
 }
 
@@ -495,6 +633,22 @@ export async function updateProspect(
     .select()
     .single();
 
+  // Stage 7 Phase 2: prospect.updated → trigger engine.
+  if (prospect) {
+    emitProspectEventSafe({
+      eventType: "prospect.updated",
+      organizationId: prospect.organization_id,
+      targetType: "prospect",
+      targetId: prospect.id,
+      payload: {
+        prospect_id: prospect.id,
+        updated_fields: Object.keys(updates),
+        updated_at: new Date().toISOString(),
+      },
+      dedupeKey: `prospect.updated:${prospect.id}:${new Date().toISOString().slice(0, 19)}`,
+    });
+  }
+
   return prospect;
 }
 
@@ -526,10 +680,31 @@ export async function updateProspectEnrichmentStatus(
 export async function deleteProspect(id: string): Promise<boolean> {
   const supabase = await createClient();
 
+  // Capture ownership before deletion so the event can be org-scoped.
+  const { data: existing } = await supabase
+    .from("prospects")
+    .select("organization_id")
+    .eq("id", id)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("prospects")
     .delete()
     .eq("id", id);
+
+  if (!error && existing) {
+    emitProspectEventSafe({
+      eventType: "prospect.deleted",
+      organizationId: existing.organization_id,
+      targetType: "prospect",
+      targetId: id,
+      payload: {
+        prospect_id: id,
+        deleted_at: new Date().toISOString(),
+      },
+      dedupeKey: `prospect.deleted:${id}`,
+    });
+  }
 
   return !error;
 }
@@ -555,16 +730,17 @@ export async function getProspectWithDetails(id: string): Promise<{
   prospect: Prospect | null;
   notes: ProspectNote[];
   listIds: string[];
+  score: ProspectScore | null;
 }> {
   const supabase = await createClient();
 
   const prospect = await getProspect(id);
   if (!prospect) {
-    return { prospect: null, notes: [], listIds: [] };
+    return { prospect: null, notes: [], listIds: [], score: null };
   }
 
-  // Fetch notes and list memberships in parallel
-  const [notesResult, itemsResult] = await Promise.all([
+  // Fetch notes, list memberships, and the stored ICP score in parallel
+  const [notesResult, itemsResult, scoreResult] = await Promise.all([
     supabase
       .from("prospect_notes")
       .select("*")
@@ -574,10 +750,11 @@ export async function getProspectWithDetails(id: string): Promise<{
       .from("saved_list_items")
       .select("list_id")
       .eq("prospect_id", id),
+    getProspectScore(id),
   ]);
 
   const notes = (notesResult.data ?? []) as ProspectNote[];
   const listIds = (itemsResult.data ?? []).map((item) => item.list_id as string);
 
-  return { prospect, notes, listIds };
+  return { prospect, notes, listIds, score: scoreResult };
 }

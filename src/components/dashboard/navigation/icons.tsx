@@ -34,8 +34,15 @@ type IconName =
   | "plus"
   | "user"
   | "automation"
+  | "enrichment"
+  | "research"
+  | "signals"
   | "billing"
-  | "integrations";
+  | "shield"
+  | "clock"
+  | "key"
+  | "receipt"
+  | "credits";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   dashboard: (
@@ -207,16 +214,64 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
     </>
   ),
+  enrichment: (
+    <>
+      {/* Stacked record layers gaining a plus — data being added to records */}
+      <path d="M12 3 3 8l9 5 9-5-9-5z" />
+      <path d="M3 13.5 12 18.5l4.5-2.5" />
+      <path d="M19.5 15v4" />
+      <path d="M17.5 17h4" />
+    </>
+  ),
+  research: (
+    <>
+      {/* Document with a magnifier — deeper context around a subject */}
+      <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4" />
+      <path d="M14 2v6h6" />
+      <circle cx="16.5" cy="15.5" r="3.5" />
+      <path d="m19 18 3 3" />
+    </>
+  ),
+  signals: (
+    <>
+      {/* Pulse line with a node — detected change/activity signal */}
+      <path d="M2 12h4l3-8 4 16 3-8h6" />
+    </>
+  ),
   billing: (
     <>
       <rect x="2" y="5" width="20" height="14" rx="2" />
       <line x1="2" y1="10" x2="22" y2="10" />
     </>
   ),
-  integrations: (
+  shield: (
     <>
-      <polyline points="16 18 22 12 16 6" />
-      <polyline points="8 6 2 12 8 18" />
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </>
+  ),
+  key: (
+    <>
+      <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
+    </>
+  ),
+  receipt: (
+    <>
+      <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1z" />
+      <line x1="8" y1="7" x2="16" y2="7" />
+      <line x1="8" y1="11" x2="16" y2="11" />
+      <line x1="8" y1="15" x2="12" y2="15" />
+    </>
+  ),
+  credits: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="4.5" />
     </>
   ),
 };

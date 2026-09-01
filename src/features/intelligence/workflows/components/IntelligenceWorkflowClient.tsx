@@ -25,17 +25,19 @@ import {
 import type {
   IntelligenceWorkflow,
   IntelligenceCondition,
+  IntelligenceConditionField,
+  IntelligenceExecution,
+  ApprovalRecord,
   IntelligenceAction,
   IntelligenceTriggerType,
-  IntelligenceConditionField,
   IntelligenceActionType,
   WorkflowStatus,
 } from "../types";
 
 interface Props {
   workflows: IntelligenceWorkflow[];
-  initialExecutions: any[];
-  initialApprovals: any[];
+  initialExecutions: IntelligenceExecution[];
+  initialApprovals: ApprovalRecord[];
 }
 
 // ============================================================================
@@ -304,7 +306,7 @@ export default function IntelligenceWorkflowClient({ workflows, initialExecution
                   </select>
                   <select
                     value={cond.operator}
-                    onChange={(e) => updateCondition(idx, { operator: e.target.value as any })}
+                    onChange={(e) => updateCondition(idx, { operator: e.target.value as IntelligenceCondition["operator"] })}
                     className="rounded-md border border-gray-300 px-2 py-1 text-sm"
                   >
                     <option value="equals">Equals</option>
@@ -472,12 +474,12 @@ export default function IntelligenceWorkflowClient({ workflows, initialExecution
             <h3 className="text-base font-semibold text-amber-800">Pending Approvals</h3>
           </div>
           <ul className="divide-y divide-amber-100">
-            {approvals.map((a: any) => (
+            {approvals.map((a) => (
               <li key={a.id} className="flex items-center justify-between px-4 py-3">
                 <div>
                   <p className="text-sm font-medium">{a.action_type.replace(/_/g, " ")}</p>
                   <p className="text-xs text-gray-500">
-                    {Object.entries(a.preview?.details ?? {}).map(([k, v]) => `${k}: ${v}`).join(" • ")}
+                    {Object.entries((a.preview?.details as Record<string, string> | undefined) ?? {}).map(([k, v]) => `${k}: ${v}`).join(" • ")}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -500,7 +502,7 @@ export default function IntelligenceWorkflowClient({ workflows, initialExecution
           <p className="px-4 py-6 text-sm text-gray-400">No executions yet.</p>
         ) : (
           <ul className="divide-y divide-gray-100">
-            {executions.map((e: any) => (
+            {executions.map((e) => (
               <li key={e.id} className="flex items-center justify-between px-4 py-3">
                 <div>
                   <p className="text-sm font-medium">{e.workflow?.name ?? "Workflow"}</p>

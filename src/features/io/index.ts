@@ -3,7 +3,6 @@
 // Stage 3 — Phase 6
 // ============================================================================
 
-export { default as ImportClient } from "./components/ImportClient";
 export { default as ExportClient } from "./components/ExportClient";
 
 export { parseFile, validateFile, objectToCSV } from "./import/parser";

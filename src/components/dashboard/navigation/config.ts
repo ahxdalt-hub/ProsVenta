@@ -20,6 +20,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Dashboard", href: "/dashboard", icon: "dashboard", featureId: "dashboard" },
       { label: "Intelligence", href: "/dashboard/intelligence", icon: "intelligence", featureId: "company_research" },
       { label: "Prospects", href: "/dashboard/prospects", icon: "prospects", featureId: "prospects" },
+      { label: "Find Leads", href: "/dashboard/find-leads", icon: "search", featureId: "prospects" },
       { label: "Saved Lists", href: "/dashboard/saved-lists", icon: "lists", featureId: "saved_lists" },
       { label: "Import", href: "/dashboard/import", icon: "import", featureId: "import" },
     ],
@@ -27,8 +28,11 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Workspace",
     items: [
+      // Members management is contextual inside Organization:
+      // no standalone navigation item — the in-page Members window handles
+      // all member management. The legacy /dashboard/organization/members
+      // route redirects back to /dashboard/organization.
       { label: "Organization", href: "/dashboard/organization", icon: "organization" },
-      { label: "Members", href: "/dashboard/organization/members", icon: "members" },
     ],
   },
   {

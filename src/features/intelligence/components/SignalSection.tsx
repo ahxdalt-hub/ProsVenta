@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -6,6 +6,7 @@ import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { detectSignals, getStoredSignals, dismissSignalAction } from "../signals/actions";
+import { CreditCostBadge, InsufficientCreditsNotice, getBillingInfo } from "@/components/dashboard/credits/CreditCostBadge";
 import {
   getSignalFreshness,
   SIGNAL_FRESHNESS_LABELS,
@@ -18,13 +19,13 @@ import {
 
 // ============================================================================
 // Signal Section
-// Stage 4 — Phase 7: Buying & Intent Signals
+// Stage 4 â€” Phase 7: Buying & Intent Signals
 // ============================================================================
 // Displays recent signals for a prospect and provides the explicit
-// "Detect Signals" action. Never runs detection on page load — only on an
+// "Detect Signals" action. Never runs detection on page load â€” only on an
 // explicit user action. Cached signals are displayed without re-detection.
 //
-// IMPORTANT: Signals are OBSERVED EVENTS with evidence — NOT proof that a
+// IMPORTANT: Signals are OBSERVED EVENTS with evidence â€” NOT proof that a
 // prospect wants to buy. Interpretation is always shown separately and uses
 // cautious language.
 // ============================================================================
@@ -40,7 +41,7 @@ export function SignalSection({ prospectId }: SignalSectionProps) {
   const [isDetecting, setIsDetecting] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  // Load cached signals on mount — does NOT run detection.
+  // Load cached signals on mount â€” does NOT run detection.
   useEffect(() => {
     let cancelled = false;
     setIsLoadingCached(true);
@@ -52,7 +53,7 @@ export function SignalSection({ prospectId }: SignalSectionProps) {
         if (!cancelled) setSignals(stored);
       })
       .catch(() => {
-        // Ignore — cached signals are best-effort.
+        // Ignore â€” cached signals are best-effort.
       })
       .finally(() => {
         if (!cancelled) setIsLoadingCached(false);
@@ -107,7 +108,7 @@ export function SignalSection({ prospectId }: SignalSectionProps) {
   return (
     <div className="space-y-3">
       {/* Action Buttons */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <Button
           size="sm"
           onClick={() => handleDetect(false)}
@@ -125,6 +126,14 @@ export function SignalSection({ prospectId }: SignalSectionProps) {
           >
             Run external
           </Button>
+        )}
+        <CreditCostBadge operationKey="signal_refresh" compact />
+        {getBillingInfo(operation)?.code === "INSUFFICIENT_CREDITS" && (
+          <InsufficientCreditsNotice
+            required={getBillingInfo(operation)?.required}
+            available={getBillingInfo(operation)?.balance}
+            compact
+          />
         )}
       </div>
 
@@ -228,7 +237,7 @@ function SignalCard({
             <span className="text-sm font-semibold text-slate-900">{signal.title}</span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            {SIGNAL_FRESHNESS_LABELS[freshness]} · {SIGNAL_CATEGORY_LABELS[signal.category]}
+            {SIGNAL_FRESHNESS_LABELS[freshness]} Â· {SIGNAL_CATEGORY_LABELS[signal.category]}
           </p>
         </button>
         <button
@@ -251,7 +260,7 @@ function SignalCard({
         Source: {signal.source}
         {signal.source_url && (
           <>
-            {" · "}
+            {" Â· "}
             <a
               href={signal.source_url}
               target="_blank"
@@ -302,3 +311,4 @@ function SignalCard({
     </div>
   );
 }
+

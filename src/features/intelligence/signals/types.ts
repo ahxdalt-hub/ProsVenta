@@ -123,9 +123,31 @@ export const SIGNAL_IMPORTANCE_LABELS: Record<SignalImportance, string> = {
 // ============================================================================
 // Status
 // ============================================================================
-export type SignalStatus = "active" | "dismissed" | "archived";
+// External signals may be 'detected' (freshly retrieved, not yet reviewed),
+// 'unverified', or 'verified' — verification is NEVER automatic.
+export type SignalStatus =
+  | "active"
+  | "detected"
+  | "unverified"
+  | "verifying"
+  | "verified"
+  | "expired"
+  | "dismissed"
+  | "archived";
 
-export const SIGNAL_STATUSES: SignalStatus[] = ["active", "dismissed", "archived"];
+export const SIGNAL_STATUSES: SignalStatus[] = [
+  "active",
+  "detected",
+  "unverified",
+  "verifying",
+  "verified",
+  "expired",
+  "dismissed",
+  "archived",
+];
+
+/** Whether a signal originated from Prosventa activity or the outside world. */
+export type SignalOrigin = "internal" | "external";
 
 // ============================================================================
 // Signal Record (Database)
@@ -136,18 +158,37 @@ export interface SignalRecord {
   prospect_id: string | null;
   signal_type: SignalType;
   category: SignalCategory;
+  /** 'internal' = Prosventa activity · 'external' = real-world provider event */
+  signal_origin: SignalOrigin;
   title: string;
   description: string;
+  /** Short human summary — kept distinct from title/description */
+  summary: string | null;
   evidence: string | null;
   source: string;
   source_url: string | null;
+  /** The source's own stable record id (provenance + dedup anchor) */
+  source_record_id: string | null;
   detected_at: string;
+  /** When the source published/reported the event (external signals) */
+  published_at: string | null;
+  /** When the event actually occurred — never invented */
+  occurred_at: string | null;
+  /** Optional expiry ceiling for time-sensitive signals */
+  expires_at: string | null;
+  /** When the source published/reported the event (external signals) */
   retrieved_at: string;
   confidence: SignalConfidence;
   importance: SignalImportance;
   status: SignalStatus;
   dedupe_key: string;
   interpretation: string | null;
+  /** Signal-capable provider that produced an external signal */
+  provider: string | null;
+  /** The provider's own event identifier (provenance + dedup) */
+  provider_signal_id: string | null;
+  /** Normalized company domain — links company-level signals to prospects */
+  company_key: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -157,18 +198,27 @@ export interface SignalRecordInsert {
   prospect_id?: string | null;
   signal_type: SignalType;
   category: SignalCategory;
+  signal_origin?: SignalOrigin;
   title: string;
   description: string;
+  summary?: string | null;
   evidence?: string | null;
   source: string;
   source_url?: string | null;
+  source_record_id?: string | null;
   detected_at: string;
+  published_at?: string | null;
+  occurred_at?: string | null;
+  expires_at?: string | null;
   retrieved_at?: string;
   confidence: SignalConfidence;
   importance: SignalImportance;
   status?: SignalStatus;
   dedupe_key: string;
   interpretation?: string | null;
+  provider?: string | null;
+  provider_signal_id?: string | null;
+  company_key?: string | null;
 }
 
 export interface SignalRecordUpdate {
@@ -215,6 +265,19 @@ export interface SignalOperationResult {
   provider: string | null;
   /** Whether external signal detection is configured */
   externalConfigured: boolean;
+  /**
+   * Controlled external-detection outcome reason, when external detection did
+   * not run or failed:
+   *   not_configured — no signal-capable provider configured
+   *   unsupported    — provider lacks the business_signals capability
+   *   rate_limited   — repeated detection throttled to protect the provider
+   *   provider_error — provider unavailable/timeout/error
+   */
+  reason?:
+    | "not_configured"
+    | "unsupported"
+    | "rate_limited"
+    | "provider_error";
 }
 
 // ============================================================================
@@ -277,3 +340,79 @@ export const SIGNAL_FRESHNESS_LABELS: Record<SignalFreshness, string> = {
   this_month: "This month",
   older: "Older",
 };
+// ============================================================================
+// Signal Evidence (Feature 3 — Phase 1)
+// ============================================================================
+// Normalized evidence associated with a signal. Answers the question
+// "Why did Prosventa show me this signal?" Each piece points at a source the
+// signal can be traced back to. Store normalized provenance only — never
+// enormous raw provider payloads.
+// ============================================================================
+
+export type SignalEvidenceType =
+  | "provider_record"
+  | "article"
+  | "event"
+  | "identity"
+  | "metadata"
+  | "other";
+
+export interface SignalEvidenceRecord {
+  id: string;
+  organization_id: string;
+  signal_id: string;
+  provider: string;
+  evidence_type: SignalEvidenceType;
+  source_name: string | null;
+  source_url: string | null;
+  source_record_id: string | null;
+  /** When the evidenced event actually happened (per the source) */
+  occurred_at: string | null;
+  /** When Prosventa captured this evidence */
+  captured_at: string;
+  /** Normalized, non-secret provenance subset of the provider payload */
+  normalized_data: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  dedupe_key: string;
+}
+
+export interface SignalEvidenceInsert {
+  organization_id: string;
+  signal_id: string;
+  provider: string;
+  evidence_type?: SignalEvidenceType;
+  source_name?: string | null;
+  source_url?: string | null;
+  source_record_id?: string | null;
+  occurred_at?: string | null;
+  captured_at?: string;
+  normalized_data?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  dedupe_key: string;
+}
+
+// ============================================================================
+// Signal Query Filters (Feature 3 — Phase 1)
+// ============================================================================
+// Normalized, server-side filter contract for the signal query service.
+// The UI never crafts raw SQL; it supplies these typed filters and the query
+// service scopes them to the caller's own organization via RLS.
+// ============================================================================
+
+export type SignalQueryFreshness = "fresh" | "aging" | "historical";
+
+export interface SignalQueryFilters {
+  prospect_id?: string | null;
+  company_key?: string | null;
+  signal_type?: SignalType | SignalType[];
+  status?: SignalStatus | SignalStatus[];
+  /** Date-range filter applied over occurred_at (event date) */
+  freshness?: SignalQueryFreshness;
+  from?: string | null;
+  to?: string | null;
+  limit?: number;
+  offset?: number;
+  order_by?: "occurred_at" | "detected_at" | "created_at";
+  order_dir?: "asc" | "desc";
+}

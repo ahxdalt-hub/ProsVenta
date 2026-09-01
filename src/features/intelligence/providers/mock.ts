@@ -40,6 +40,15 @@ const MOCK_CONFIG: IntelligenceProviderConfig = {
     "prospect_research",
     "signals",
   ],
+  capabilities: [
+    "company_enrichment",
+    "person_enrichment",
+    "company_research",
+    "person_research",
+    "technology_data",
+    "contact_data",
+    "business_signals",
+  ],
 };
 
 const INDUSTRIES = [

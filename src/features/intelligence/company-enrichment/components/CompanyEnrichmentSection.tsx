@@ -1,9 +1,9 @@
-// ============================================================================
-// Prosventa Company Enrichment — Section
-// Stage 5 — Phase 2: Company Enrichment
+﻿// ============================================================================
+// Prosventa Company Enrichment â€” Section
+// Stage 5 â€” Phase 2: Company Enrichment
 // ============================================================================
 // Premium company intelligence workspace. Displays a rich, trustworthy company
-// profile from enrichment data. Never calls the provider on page load — only
+// profile from enrichment data. Never calls the provider on page load â€” only
 // on an explicit user action. Cached results are displayed without provider
 // calls.
 //
@@ -22,6 +22,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { checkFreshness } from "../../normalized";
 import { confidenceLabel } from "../confidence";
 import { enrichCompany, getStoredCompanyEnrichment } from "../actions";
+import { CreditCostBadge, InsufficientCreditsNotice, getBillingInfo } from "@/components/dashboard/credits/CreditCostBadge";
 import type { CompanyEnrichmentOperationResult } from "../types";
 import type { CompanyEnrichmentRecordLike } from "../service";
 import type { CompanyEnrichmentResult } from "../../types";
@@ -41,7 +42,7 @@ export function CompanyEnrichmentSection({
   const [isLoadingCached, setIsLoadingCached] = useState(true);
   const [isEnriching, setIsEnriching] = useState(false);
 
-  // Load cached enrichment on mount — does NOT call the provider.
+  // Load cached enrichment on mount â€” does NOT call the provider.
   useEffect(() => {
     let cancelled = false;
     setIsLoadingCached(true);
@@ -53,7 +54,7 @@ export function CompanyEnrichmentSection({
         if (!cancelled) setRecord(stored);
       })
       .catch(() => {
-        // Ignore — cached enrichment is best-effort.
+        // Ignore â€” cached enrichment is best-effort.
       })
       .finally(() => {
         if (!cancelled) setIsLoadingCached(false);
@@ -118,7 +119,7 @@ export function CompanyEnrichmentSection({
   return (
     <div className="space-y-3">
       {/* Action Buttons */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <Button
           size="sm"
           onClick={() => handleEnrich(false)}
@@ -136,6 +137,14 @@ export function CompanyEnrichmentSection({
           >
             Refresh
           </Button>
+        )}
+        <CreditCostBadge operationKey="company_enrichment" compact />
+        {getBillingInfo(operation)?.code === "INSUFFICIENT_CREDITS" && (
+          <InsufficientCreditsNotice
+            required={getBillingInfo(operation)?.required}
+            available={getBillingInfo(operation)?.balance}
+            compact
+          />
         )}
       </div>
 
@@ -164,7 +173,7 @@ export function CompanyEnrichmentSection({
         </div>
       )}
 
-      {/* Enrichment in progress — keep existing data visible */}
+      {/* Enrichment in progress â€” keep existing data visible */}
       {isEnriching && (
         <div
           role="status"
@@ -244,6 +253,19 @@ function EnrichmentProfile({
       ? String(data.employeeCount)
       : data.employeeRange ?? null;
 
+  // Technologies arrive as a raw, free-text list straight from the provider and
+  // are stored unfiltered, so they can legally contain blank and/or duplicate
+  // names. Dedupe and drop blank entries so each rendered chip carries a
+  // unique, non-empty React key (prevents key="" collisions).
+  const technologies = Array.from(
+    new Set(
+      data.technologies
+        .filter((t) => typeof t === "string")
+        .map((t) => t.trim())
+        .filter((t) => t !== "")
+    )
+  );
+
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3 space-y-4">
       {/* Company Header */}
@@ -254,7 +276,7 @@ function EnrichmentProfile({
         {data.domain && <p className="text-xs text-slate-400 mt-0.5">{data.domain}</p>}
         {(data.industry || location || employeeLabel) && (
           <p className="text-xs text-slate-500 mt-1">
-            {[data.industry, location, employeeLabel].filter(Boolean).join(" · ")}
+            {[data.industry, location, employeeLabel].filter(Boolean).join(" Â· ")}
           </p>
         )}
       </div>
@@ -280,11 +302,11 @@ function EnrichmentProfile({
       )}
 
       {/* Technology */}
-      {data.technologies.length > 0 && (
+      {technologies.length > 0 && (
         <div>
           <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Technology</p>
           <div className="flex flex-wrap gap-1.5">
-            {data.technologies.map((tech) => (
+            {technologies.map((tech) => (
               <span
                 key={tech}
                 className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600"
@@ -320,7 +342,7 @@ function EnrichmentProfile({
         </div>
         {usedCached && (
           <p className="text-xs text-slate-400 pt-1">
-            Showing recently enriched data — no provider call was made.
+            Showing recently enriched data â€” no provider call was made.
           </p>
         )}
       </div>
@@ -338,3 +360,4 @@ function DetailRow({ label, value }: { label: string; value: string | null }) {
     </div>
   );
 }
+

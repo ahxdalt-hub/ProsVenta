@@ -1,9 +1,4 @@
 export { RoleBadge } from "./RoleBadge";
-export { MemberCard } from "./MemberCard";
-export { CommentCard } from "./CommentCard";
 export { ActivityFeed } from "./ActivityFeed";
 export { NotificationCard } from "./NotificationCard";
 export { NotificationsList } from "./NotificationsList";
-export { InviteMemberModal } from "./InviteMemberModal";
-export { WorkspaceCard } from "./WorkspaceCard";
-export { MembersClient } from "./MembersClient";

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -6,6 +6,7 @@ import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { researchProspect, getStoredProspectResearch } from "../prospect-research/actions";
+import { CreditCostBadge, InsufficientCreditsNotice, getBillingInfo } from "@/components/dashboard/credits/CreditCostBadge";
 import type {
   ProspectResearchOperationResult,
   ProspectResearchRecord,
@@ -15,10 +16,10 @@ import type {
 
 // ============================================================================
 // Prospect Research Section
-// Stage 4 — Phase 5: AI Prospect Research
+// Stage 4 â€” Phase 5: AI Prospect Research
 // ============================================================================
 // Displays the grounded prospect-intelligence brief and provides the explicit
-// "Research Prospect" action. Never runs research on page load — only on an
+// "Research Prospect" action. Never runs research on page load â€” only on an
 // explicit user action. Cached results are displayed without AI calls.
 // ============================================================================
 
@@ -34,7 +35,7 @@ export function ProspectResearchSection({ prospectId, hasData }: ProspectResearc
   const [isLoadingCached, setIsLoadingCached] = useState(true);
   const [isResearching, setIsResearching] = useState(false);
 
-  // Load cached research on mount — does NOT run AI.
+  // Load cached research on mount â€” does NOT run AI.
   useEffect(() => {
     let cancelled = false;
     setIsLoadingCached(true);
@@ -46,7 +47,7 @@ export function ProspectResearchSection({ prospectId, hasData }: ProspectResearc
         if (!cancelled) setRecord(stored);
       })
       .catch(() => {
-        // Ignore — cached research is best-effort.
+        // Ignore â€” cached research is best-effort.
       })
       .finally(() => {
         if (!cancelled) setIsLoadingCached(false);
@@ -94,7 +95,7 @@ export function ProspectResearchSection({ prospectId, hasData }: ProspectResearc
   return (
     <div className="space-y-3">
       {/* Action Buttons */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <Button
           size="sm"
           onClick={() => handleResearch(false)}
@@ -112,6 +113,14 @@ export function ProspectResearchSection({ prospectId, hasData }: ProspectResearc
           >
             Refresh
           </Button>
+        )}
+        <CreditCostBadge operationKey="prospect_research" compact />
+        {getBillingInfo(operation)?.code === "INSUFFICIENT_CREDITS" && (
+          <InsufficientCreditsNotice
+            required={getBillingInfo(operation)?.required}
+            available={getBillingInfo(operation)?.balance}
+            compact
+          />
         )}
       </div>
 
@@ -202,7 +211,7 @@ function ProspectResearchResultView({
       {result.likelyResponsibilities && result.likelyResponsibilities.length > 0 && (
         <ResearchBlock
           label="Likely Responsibilities"
-          content={result.likelyResponsibilities.join(" · ")}
+          content={result.likelyResponsibilities.join(" Â· ")}
         />
       )}
 
@@ -224,7 +233,7 @@ function ProspectResearchResultView({
       {result.publicProfessionalContext && result.publicProfessionalContext.length > 0 && (
         <ResearchBlock
           label="Public Professional Context"
-          content={result.publicProfessionalContext.join(" · ")}
+          content={result.publicProfessionalContext.join(" Â· ")}
         />
       )}
 
@@ -235,7 +244,7 @@ function ProspectResearchResultView({
       {result.possiblePainPoints && result.possiblePainPoints.length > 0 && (
         <ResearchBlock
           label="Possible Pain Points"
-          content={result.possiblePainPoints.join(" · ")}
+          content={result.possiblePainPoints.join(" Â· ")}
         />
       )}
 
@@ -304,8 +313,8 @@ function ProspectResearchResultView({
         <SourceList sources={result.sources ?? []} />
         <p className="text-xs text-slate-400">
           Provider: {provider}
-          {model && ` · Model: ${model}`}
-          {researchedAt && ` · Researched: ${formatDate(researchedAt)}`}
+          {model && ` Â· Model: ${model}`}
+          {researchedAt && ` Â· Researched: ${formatDate(researchedAt)}`}
         </p>
         {hasExternal ? (
           <p className="text-xs text-slate-500">
@@ -361,3 +370,5 @@ function SourceList({ sources }: { sources: ProspectResearchSource[] }) {
     </ul>
   );
 }
+
+

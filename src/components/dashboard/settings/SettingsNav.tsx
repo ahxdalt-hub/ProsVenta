@@ -1,191 +1,139 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { DashboardIcon } from "@/components/dashboard/navigation/icons";
+import {
+  getImplementedNavGroups,
+  settingsHref,
+  type SettingsNavItem,
+} from "@/lib/settings/navigation";
+import { transitions, EASE_OUT, DURATION } from "@/lib/motion";
 
 // ============================================================================
-// Types
+// SettingsNavigation
+// ============================================================================
+// Route-based settings navigation driven by the central IA config.
+// - Desktop (lg+): persistent sidebar.
+// - Mobile / tablet: collapsible disclosure panel above the content —
+//   touch-friendly targets, not a squeezed-down sidebar.
 // ============================================================================
 
-export type SettingsSection =
-  | "profile"
-  | "appearance"
-  | "notifications"
-  | "security"
-  | "workspace"
-  | "accessibility"
-  | "about"
-  | "support"
-  | "icp";
+const NAV_GROUPS = getImplementedNavGroups();
 
-interface NavItem {
-  id: SettingsSection;
-  label: string;
-  icon: React.ReactNode;
-}
+/** Flat list of implemented items, used to resolve the active item. */
+const ALL_NAV_ITEMS: SettingsNavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 
-interface NavGroup {
-  label: string;
-  items: NavItem[];
-}
+export function SettingsNavigation() {
+  const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-// ============================================================================
-// Navigation Config
-// ============================================================================
-// Organised like Linear/Stripe/Notion settings:
-// Profile → Account → Organization → Preferences → Security
-// ============================================================================
+  const activeItem =
+    ALL_NAV_ITEMS.find((item) => pathname === settingsHref(item.id)) ?? null;
 
-const NAV_GROUPS: NavGroup[] = [
-  {
-    label: "Profile",
-    items: [
-      {
-        id: "profile",
-        label: "Profile",
-        icon: (
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-            <circle cx="12" cy="7" r="4" />
-          </svg>
-        ),
-      },
-      {
-        id: "security",
-        label: "Security",
-        icon: (
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-          </svg>
-        ),
-      },
-    ],
-  },
-  {
-    label: "Organization",
-    items: [
-      {
-        id: "workspace",
-        label: "Workspace",
-        icon: (
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="4" y="2" width="16" height="20" rx="2" />
-            <path d="M9 22v-4h6v4" />
-          </svg>
-        ),
-      },
-      {
-        id: "icp",
-        label: "Ideal Customer Profile",
-        icon: (
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <circle cx="12" cy="12" r="6" />
-            <circle cx="12" cy="12" r="2" />
-          </svg>
-        ),
-      },
-    ],
-  },
-  {
-    label: "Preferences",
-    items: [
-      {
-        id: "appearance",
-        label: "Appearance",
-        icon: (
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="5" />
-            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-          </svg>
-        ),
-      },
-      {
-        id: "notifications",
-        label: "Notifications",
-        icon: (
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-          </svg>
-        ),
-      },
-      {
-        id: "accessibility",
-        label: "Accessibility",
-        icon: (
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M4.93 4.93l4.24 4.24M14.83 9.17l4.24-4.24M14.83 14.83l4.24 4.24M9.17 14.83l-4.24 4.24" />
-            <circle cx="12" cy="12" r="4" />
-          </svg>
-        ),
-      },
-    ],
-  },
-  {
-    label: "Help & Support",
-    items: [
-      {
-        id: "about",
-        label: "About",
-        icon: (
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="16" x2="12" y2="12" />
-            <line x1="12" y1="8" x2="12.01" y2="8" />
-          </svg>
-        ),
-      },
-      {
-        id: "support",
-        label: "Support",
-        icon: (
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-            <line x1="12" y1="17" x2="12.01" y2="17" />
-          </svg>
-        ),
-      },
-    ],
-  },
-];
+  // Collapse the mobile panel whenever the route changes.
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
-// ============================================================================
-// Component
-// ============================================================================
-
-interface SettingsNavProps {
-  active: SettingsSection;
-  onChange: (section: SettingsSection) => void;
-}
-
-export function SettingsNav({ active, onChange }: SettingsNavProps) {
-  return (
-    <nav className="space-y-1" aria-label="Settings navigation">
-      {NAV_GROUPS.map((group) => (
-        <div key={group.label}>
-          <p className="dashboard-nav-group-label">{group.label}</p>
-          <div className="space-y-0.5">
-            {group.items.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => onChange(item.id)}
-                aria-current={active === item.id ? "page" : undefined}
-                className={cn(
-                  "settings-nav-item",
-                  active === item.id && "settings-nav-item-active"
-                )}
-              >
-                <span className="settings-nav-icon shrink-0">{item.icon}</span>
-                <span>{item.label}</span>
-              </button>
-            ))}
+  function renderItems() {
+    return (
+      <nav aria-label="Settings navigation" className="space-y-5">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.id}>
+            <p className="dashboard-nav-group-label">{group.label}</p>
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const href = settingsHref(item.id);
+                const isActive = activeItem?.id === item.id;
+                return (
+                  <Link
+                    key={item.id}
+                    href={href}
+                    aria-current={isActive ? "page" : undefined}
+                    className={cn(
+                      "settings-nav-item relative",
+                      isActive && "settings-nav-item-active"
+                    )}
+                  >
+                    {/* Animated active indicator */}
+                    {isActive && (
+                      <motion.span
+                        layoutId="settings-nav-active"
+                        transition={{ duration: DURATION.base, ease: EASE_OUT }}
+                        className="absolute inset-0 rounded-lg bg-slate-100"
+                        aria-hidden="true"
+                      />
+                    )}
+                    <span className="settings-nav-icon shrink-0 relative z-10">
+                      <DashboardIcon name={item.icon} size={16} />
+                    </span>
+                    <span className="relative z-10">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ))}
-    </nav>
+        ))}
+      </nav>
+    );
+  }
+
+  return (
+    <>
+      {/* Desktop / large tablet: persistent sidebar */}
+      <aside className="hidden lg:block lg:sticky lg:top-20 h-fit">
+        {renderItems()}
+      </aside>
+
+      {/* Mobile / small tablet: collapsible section picker */}
+      <div className="lg:hidden">
+        <button
+          type="button"
+          onClick={() => setMobileOpen((open) => !open)}
+          aria-expanded={mobileOpen}
+          aria-controls="settings-mobile-nav"
+          className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm transition-colors duration-150 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+        >
+          <span className="flex items-center gap-2.5 min-w-0">
+            <span className="text-slate-500 shrink-0">
+              {activeItem ? <DashboardIcon name={activeItem.icon} size={16} /> : null}
+            </span>
+            <span className="truncate">
+              {activeItem ? activeItem.label : "Settings"}
+            </span>
+          </span>
+          <motion.span
+            animate={{ rotate: mobileOpen ? 180 : 0 }}
+            transition={transitions.fast}
+            className="text-slate-400 shrink-0"
+            aria-hidden="true"
+          >
+            <DashboardIcon name="chevron-down" size={16} />
+          </motion.span>
+        </button>
+
+        <AnimatePresence initial={false}>
+          {mobileOpen && (
+            <motion.div
+              id="settings-mobile-nav"
+              key="panel"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: DURATION.base, ease: EASE_OUT }}
+              className="overflow-hidden"
+            >
+              <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                {renderItems()}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </>
   );
 }

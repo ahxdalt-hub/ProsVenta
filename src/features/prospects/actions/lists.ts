@@ -7,7 +7,9 @@ import {
   createSavedList,
   updateSavedList,
   deleteSavedList,
+  removeFromListMany,
 } from "@/lib/db/lists";
+import { EntitlementService } from "@/features/plans/service";
 
 /**
  * Creates a new saved list for the authenticated user's organization.
@@ -35,6 +37,24 @@ export async function createSavedListAction(
 
   if (!membership) {
     return { error: "You are not a member of an organization." };
+  }
+
+  // Stage 8 Phase 6 — server-side plan limit enforcement (authoritative).
+  try {
+    const decision = await EntitlementService.checkLimit(
+      membership.organization_id,
+      "max_saved_lists"
+    );
+    if (!decision.allowed) {
+      return {
+        error:
+          decision.errorCode === "FEATURE_NOT_INCLUDED"
+            ? "Your plan doesn't include saved lists. Upgrade your plan to organize prospects into lists."
+            : `You've reached your plan limit (${decision.currentUsage} of ${decision.limitValue} saved lists). View your plan to get more capacity.`,
+      };
+    }
+  } catch {
+    // Never block core CRUD on entitlement infrastructure hiccups.
   }
 
   try {
@@ -112,6 +132,44 @@ export async function deleteSavedListAction(
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Failed to delete list.",
+    };
+  }
+}
+
+/**
+ * Removes multiple prospects from a saved list (membership only).
+ * The underlying prospects are NEVER deleted — a list is a container.
+ */
+export async function removeProspectsFromListAction(
+  listId: string,
+  prospectIds: string[]
+): Promise<{ error: string | null; removed: number }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+
+  if (prospectIds.length === 0) {
+    return { error: null, removed: 0 };
+  }
+
+  try {
+    const ok = await removeFromListMany(listId, prospectIds);
+    if (!ok) {
+      return { error: "Could not remove prospects from list.", removed: 0 };
+    }
+    revalidatePath(`/dashboard/saved-lists/${listId}`);
+    revalidatePath("/dashboard/saved-lists");
+    return { error: null, removed: prospectIds.length };
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to remove prospects from list.",
+      removed: 0,
     };
   }
 }

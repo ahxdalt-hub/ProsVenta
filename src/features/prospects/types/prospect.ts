@@ -9,9 +9,33 @@
 
 import type {
   EnrichmentStatus,
+  Prospect,
   ProspectSource,
   ProspectStatus,
 } from "@/types/database";
+import type { ScoreCategory } from "@/features/intelligence/scoring/types";
+
+// ============================================================================
+// Prospect With Embedded ICP Score
+// ============================================================================
+// A Prospect row as returned by queryProspects, with the ICP score embedded
+// via the prospect_scores relationship (single query — no N+1).
+// `prospect_scores` is null/absent when the prospect has not been scored yet.
+// ============================================================================
+// Recommendation Hint (compact, for table rows)
+// ============================================================================
+// Minimal active-recommendation information embedded by queryProspects via
+// ONE batch query per page — never a per-row lookup.
+export interface ProspectRecommendationHint {
+  recommendation_type: string;
+  priority: "high" | "medium" | "low";
+}
+
+export type ProspectWithScore = Prospect & {
+  prospect_scores?: { score: number; category: ScoreCategory } | null;
+  /** Active (non-dismissed) recommendations for this prospect. Empty when none exist. */
+  active_recommendations?: ProspectRecommendationHint[] | null;
+};
 
 // ============================================================================
 // Prospect Input

@@ -62,15 +62,6 @@ export const COMMAND_LIST: readonly PaletteCommand[] = [
     keywords: ["company", "workspace", "team"],
   },
   {
-    id: "members",
-    label: "Members",
-    href: "/dashboard/organization/members",
-    section: "Workspace",
-    icon: "members",
-    description: "Team members and roles",
-    keywords: ["people", "users", "roles", "invite"],
-  },
-  {
     id: "settings",
     label: "Settings",
     href: "/dashboard/settings",

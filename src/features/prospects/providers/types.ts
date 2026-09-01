@@ -10,7 +10,12 @@
 // This is the architecture only — ready for Stage 2 — Phase 8.
 // ============================================================================
 
-import type { DiscoveryCriteria, DiscoveryResponse } from "@/features/prospects/types/discovery";
+import type {
+  DiscoveryCriteria,
+  DiscoveryResponse,
+  LeadSearchPage,
+  LeadSearchRequest,
+} from "@/features/prospects/types/discovery";
 
 // ============================================================================
 // Provider Configuration
@@ -66,4 +71,26 @@ export interface ProviderRegistry {
   getAllProviders(): ProspectProvider[];
   /** Register a new provider */
   register(provider: ProspectProvider): void;
+}
+
+// ============================================================================
+// Lead Discovery Provider (Phase 8 — real provider-backed search)
+// ============================================================================
+// Extended contract for providers that support paginated, person-level lead
+// search. Implementations run SERVER-SIDE ONLY: API keys are read from
+// server environment variables and must never reach the browser.
+// ============================================================================
+
+export interface LeadDiscoveryProvider {
+  getConfig(): ProviderConfig;
+
+  /**
+   * Execute a normalized lead search. The adapter is responsible for:
+   * - Translating the normalized request into the provider's API format
+   * - Reading its credentials from server-side environment variables
+   * - Mapping provider errors onto structured DiscoveryError codes
+   * - Normalizing raw records into the NormalizedLead shape
+   * - Cursor-based pagination (never loading unbounded result sets)
+   */
+  searchLeads(request: LeadSearchRequest): Promise<LeadSearchPage>;
 }

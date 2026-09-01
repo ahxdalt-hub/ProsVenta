@@ -124,10 +124,32 @@ export async function POST(request: NextRequest) {
     // 6. Persist processed prospects (RLS enforces org isolation)
     const prospects = await createProspects(processed);
 
+    // 7. Stage 5 Task 4: automatically queue intelligence processing for all
+    // newly persisted prospects. Secondary operation — never fails the import.
+    // Jobs are queued cheaply; execution happens after this request responds
+    // via Next.js `after()` so large imports never block or time out.
+    try {
+      const { queueIntelligenceProcessing, runIntelligencePipeline } = await import(
+        "@/features/intelligence/pipeline"
+      );
+      const { after } = await import("next/server");
+      const queuedIds = await queueIntelligenceProcessing(prospects.map((p) => p.id));
+      if (queuedIds.length > 0) {
+        after(async () => {
+          await runIntelligencePipeline(queuedIds);
+        });
+      }
+    } catch (scoringError) {
+      console.error("[prospects/process] Intelligence queueing failed:", scoringError);
+    }
+
     return NextResponse.json({
       result,
       prospects: prospects.length > 0 ? prospects : null,
-      message: "Prospect data processed successfully.",
+      message:
+        prospects.length > 1
+          ? `Import processed successfully. Intelligence processing started for ${prospects.length} prospects.`
+          : "Prospect data processed successfully.",
     });
   } catch (error) {
     console.error("Prospect processing API error:", error);

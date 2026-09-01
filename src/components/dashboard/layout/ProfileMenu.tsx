@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { DashboardIcon } from "@/components/dashboard/navigation/icons";
-import { DefaultAvatar } from "@/components/dashboard/settings/DefaultAvatar";
+import { Avatar } from "@/components/ui/Avatar";
 import { EASE_OUT } from "@/lib/motion";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -147,16 +147,13 @@ export function ProfileMenu({
         )}
       >
         {/* Avatar */}
-        <div className="h-7 w-7 shrink-0 overflow-hidden rounded-full">
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <DefaultAvatar size="sm" className="h-7 w-7 rounded-full" />
-          )}
+        <div className="h-7 w-7 shrink-0">
+          <Avatar
+            src={avatarUrl}
+            name={displayName}
+            size="sm"
+            className="h-full w-full"
+          />
         </div>
 
         {/* Name — hidden on mobile to keep topbar compact */}
@@ -192,16 +189,13 @@ export function ProfileMenu({
                 Profile Section — avatar, name, job role, org
                 ---------------------------------------------------------- */}
             <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-4">
-              <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full ring-2 ring-slate-100">
-                {avatarUrl ? (
-                  <img
-                    src={avatarUrl}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <DefaultAvatar size="md" className="h-11 w-11 rounded-full" />
-                )}
+              <div className="h-11 w-11 shrink-0">
+                <Avatar
+                  src={avatarUrl}
+                  name={displayName}
+                  size="lg"
+                  className="ring-2 ring-slate-100"
+                />
               </div>
               <div className="min-w-0 flex-1 space-y-0.5">
                 <p className="truncate text-sm font-semibold leading-tight text-slate-900">

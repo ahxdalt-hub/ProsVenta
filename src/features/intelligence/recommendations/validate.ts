@@ -7,9 +7,10 @@
 // ============================================================================
 
 import {
+  RECOMMENDATION_PRIORITIES,
+  RECOMMENDATION_SOURCE_TYPES,
   RECOMMENDATION_TYPES,
   type RecommendationInput,
-  type RecommendationPriority,
   type RecommendationType,
 } from "./types";
 
@@ -45,12 +46,26 @@ export function validateRecommendationInput(input: RecommendationInput): Recomme
     errors.push({ field: "reasoning", message: "Reasoning is required." });
   }
 
+  // Evidence-grounding is mandatory: a recommendation without evidence is
+  // rejected before it ever reaches the database.
   if (!input.evidence || input.evidence.length === 0) {
     errors.push({ field: "evidence", message: "At least one evidence item is required." });
+  } else if (
+    input.evidence.some(
+      (item) => !item.type || !item.label || item.label.trim().length === 0
+    )
+  ) {
+    errors.push({
+      field: "evidence",
+      message: "Every evidence item must have a type and a human-readable label.",
+    });
   }
 
-  if (!isValidPriority(input.priority)) {
-    errors.push({ field: "priority", message: "Priority must be high, medium, or low." });
+  if (!RECOMMENDATION_PRIORITIES.includes(input.priority)) {
+    errors.push({
+      field: "priority",
+      message: "Priority must be very_high, high, medium, low, or very_low.",
+    });
   }
 
   if (typeof input.confidence !== "number" || input.confidence < 0 || input.confidence > 100) {
@@ -61,11 +76,17 @@ export function validateRecommendationInput(input: RecommendationInput): Recomme
     errors.push({ field: "dedupe_key", message: "Deduplication key is required." });
   }
 
-  return errors;
-}
+  if (
+    input.source_type !== undefined &&
+    !RECOMMENDATION_SOURCE_TYPES.includes(input.source_type)
+  ) {
+    errors.push({
+      field: "source_type",
+      message: "Source must be intelligence, signal, icp, or system.",
+    });
+  }
 
-function isValidPriority(value: string): value is RecommendationPriority {
-  return value === "high" || value === "medium" || value === "low";
+  return errors;
 }
 
 /**

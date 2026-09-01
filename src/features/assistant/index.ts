@@ -41,4 +41,6 @@ export {
   MiniCloseIcon,
   MinusIcon,
   MaximizeIcon,
+  ArrowUpIcon,
+  RotateIcon,
 } from "./components/icons";

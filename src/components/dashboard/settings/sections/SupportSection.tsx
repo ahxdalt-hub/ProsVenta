@@ -1,148 +1,214 @@
+import Link from "next/link";
+import { settingsHref } from "@/lib/settings/navigation";
 import { SettingsCard, SettingsCardHeader } from "../SettingsCard";
-import { APP_NAME } from "@/constants";
+
+// ============================================================================
+// SupportSection - Settings > Help & Support
+// ============================================================================
+// Phase 2 rebuild: a real support center. Only destinations that actually
+// exist are linked - the in-app Help Center (/dashboard/help) and the support
+// email used there (support@prosventa.com). Troubleshooting flows match actual
+// product behavior. No fake forms, no fabricated URLs.
+// ============================================================================
+
+const QUICK_HELP = [
+  {
+    title: "Prospects",
+    description: "Importing, scoring and managing your prospect pipeline.",
+    href: "/dashboard/help",
+  },
+  {
+    title: "Intelligence",
+    description: "Enrichment, research, signals and recommendations explained.",
+    href: "/dashboard/help",
+  },
+  {
+    title: "Credits",
+    description: "How Credits work, what operations cost, and your balance.",
+    href: settingsHref("credits"),
+  },
+  {
+    title: "Billing",
+    description: "Plans, purchases and payment history.",
+    href: settingsHref("plan-billing"),
+  },
+  {
+    title: "Workspace",
+    description: "Organization identity, members and roles.",
+    href: "/dashboard/organization",
+  },
+  {
+    title: "Account",
+    description: "Profile details, password and account protection.",
+    href: settingsHref("profile"),
+  },
+];
+
+const TROUBLESHOOTING = [
+  {
+    problem: "Credits didn't update after an operation",
+    steps: [
+      "Refresh the page - the balance is fetched live from the server.",
+      "Check Credits & Usage: failed operations are never charged.",
+      "Still wrong after a few minutes? Contact support with the approximate time of the operation.",
+    ],
+  },
+  {
+    problem: "An intelligence operation failed",
+    steps: [
+      "Open the prospect and retry the operation once - transient provider errors are common.",
+      "If every operation fails, the workspace's intelligence provider may be unavailable (see AI & Intelligence status).",
+      "Repeated failures are never charged to your credit balance.",
+    ],
+  },
+  {
+    problem: "An import didn't complete",
+    steps: [
+      "Re-open Import Center - completed rows are kept, so re-importing is safe.",
+      "Check the file format: CSV or Excel with a clear header row works best.",
+    ],
+  },
+  {
+    problem: "A payment is still pending",
+    steps: [
+      "Purchases can take a few minutes to confirm at the payment provider.",
+      "Check Purchases for the latest status before contacting support.",
+    ],
+  },
+  {
+    problem: "Profile photo failed to upload",
+    steps: [
+      "Use a JPG, PNG, WebP or GIF image under 5MB.",
+      "Try again after refreshing - uploads are retried safely and never leave a broken avatar.",
+    ],
+  },
+];
 
 export function SupportSection() {
   return (
     <div className="space-y-6">
-      {/* Help resources */}
-      <SettingsCard>
-        <SettingsCardHeader
-          title="Help & Support"
-          description="Get the help you need"
-          icon={
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-          }
-        />
-        <div className="space-y-1">
-          <SupportLink
+      {/* Support contact - prominent, real destination */}
+      <SettingsCard className="border-blue-100 bg-gradient-to-br from-blue-50/70 to-white">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3.5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-blue-600 ring-1 ring-blue-100">
+              <HelpIcon />
+            </span>
+            <div>
+              <h3 className="text-[15px] font-bold tracking-tight text-slate-900">
+                Something isn&apos;t working?
+              </h3>
+              <p className="mt-0.5 max-w-lg text-[13px] leading-relaxed text-slate-500">
+                Write to{" "}
+                <a
+                  href="mailto:support@prosventa.com"
+                  className="font-semibold text-blue-600 transition-colors hover:text-blue-700"
+                >
+                  support@prosventa.com
+                </a>{" "}
+                - our team answers by email, usually within business hours.
+              </p>
+            </div>
+          </div>
+          <Link
             href="/dashboard/help"
-            icon={
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-                <polyline points="10 9 9 9 8 9" />
-              </svg>
-            }
-            title="Documentation"
-            description="Browse guides, tutorials, and best practices"
-          />
-          <SupportLink
-            href="mailto:support@prosventa.com"
-            icon={
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                <polyline points="22,6 12,13 2,6" />
-              </svg>
-            }
-            title="Contact Support"
-            description="Email our team at support@prosventa.com"
-          />
-          <SupportLink
-            href="/dashboard/help"
-            icon={
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              </svg>
-            }
-            title="Community"
-            description="Connect with other Prosventa users"
-          />
+            className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-center text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
+          >
+            Open Help Center
+          </Link>
+        </div>
+        <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-[13px] font-semibold text-slate-800">What to include when contacting support</p>
+          <ul className="mt-2 grid grid-cols-1 gap-1.5 text-[13px] leading-relaxed text-slate-500 sm:grid-cols-2">
+            <Bullet>What happened, and what you expected instead</Bullet>
+            <Bullet>The relevant prospect, operation or purchase</Bullet>
+            <Bullet>The approximate time it occurred</Bullet>
+            <Bullet>A screenshot if it helps - never passwords or keys</Bullet>
+          </ul>
         </div>
       </SettingsCard>
 
-      {/* Status */}
+      {/* Quick help categories */}
       <SettingsCard>
         <SettingsCardHeader
-          title="System Status"
-          description="Current service availability"
-          icon={
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-              <polyline points="22 4 12 14.01 9 11.01" />
-            </svg>
-          }
+          title="Quick help"
+          description="Jump straight to the area you need."
         />
-        <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green-50">
-            <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-slate-900">All systems operational</p>
-            <p className="text-[13px] text-slate-500">No incidents reported</p>
-          </div>
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {QUICK_HELP.map((item) => (
+            <li key={item.title}>
+              <Link
+                href={item.href}
+                className="group block h-full rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:border-blue-300"
+              >
+                <span className="text-sm font-semibold text-slate-900 transition-colors group-hover:text-blue-700">
+                  {item.title}
+                </span>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">{item.description}</p>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </SettingsCard>
+
+      {/* Troubleshooting */}
+      <SettingsCard>
+        <SettingsCardHeader
+          title="Troubleshooting"
+          description="Fast fixes for the most common issues."
+        />
+        <div className="space-y-3">
+          {TROUBLESHOOTING.map((item) => (
+            <details
+              key={item.problem}
+              className="group rounded-xl border border-slate-200 bg-white open:border-slate-300"
+            >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-slate-800 [&::-webkit-details-marker]:hidden">
+                {item.problem}
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 group-open:rotate-180"
+                  aria-hidden="true"
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </summary>
+              <ol className="space-y-1.5 border-t border-slate-100 px-4 pb-4 pt-3 text-[13px] leading-relaxed text-slate-500">
+                {item.steps.map((step, i) => (
+                  <li key={i} className="flex gap-2">
+                    <span className="font-semibold tabular-nums text-slate-400">{i + 1}.</span>
+                    {step}
+                  </li>
+                ))}
+              </ol>
+            </details>
+          ))}
         </div>
       </SettingsCard>
-
-      {/* Feedback */}
-      <SettingsCard>
-        <SettingsCardHeader
-          title="Feedback"
-          description="Help us improve Prosventa"
-          icon={
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-            </svg>
-          }
-        />
-        <p className="text-sm text-slate-600 leading-relaxed">
-          Have an idea or found a bug? We would love to hear from you. Send your feedback to{" "}
-          <a href="mailto:feedback@prosventa.com" className="text-blue-600 font-medium hover:underline">
-            feedback@prosventa.com
-          </a>
-          .
-        </p>
-      </SettingsCard>
-
-      {/* Footer */}
-      <div className="text-center py-4">
-        <p className="text-[13px] text-slate-500">
-          {APP_NAME} — Premium prospect discovery platform
-        </p>
-      </div>
     </div>
   );
 }
 
-function SupportLink({
-  href,
-  icon,
-  title,
-  description,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}) {
+function Bullet({ children }: { children: React.ReactNode }) {
   return (
-    <a
-      href={href}
-      className="flex items-center gap-4 py-3 px-3 -mx-3 rounded-lg hover:bg-slate-50 transition-colors group"
-    >
-      <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-slate-50 text-slate-500 shrink-0">
-        {icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-900">{title}</p>
-        <p className="text-[13px] text-slate-500 mt-0.5">{description}</p>
-      </div>
-      <svg
-        className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors shrink-0"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M9 18l6-6-6-6" />
-      </svg>
-    </a>
+    <li className="flex items-start gap-2">
+      <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400" aria-hidden="true" />
+      {children}
+    </li>
+  );
+}
+
+function HelpIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
   );
 }

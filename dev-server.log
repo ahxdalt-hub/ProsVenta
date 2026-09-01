@@ -1,0 +1,16 @@
+
+> prosventa@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.12 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.5:3000
+- Environments: .env.local
+✓ Ready in 500ms
+
+ GET / 200 in 487ms (next.js: 85ms, proxy.ts: 163ms, application-code: 238ms)
+ GET / 200 in 113ms (next.js: 6ms, proxy.ts: 8ms, application-code: 99ms)
+ GET /login 200 in 212ms (next.js: 75ms, proxy.ts: 6ms, application-code: 132ms)
+ GET /signup 200 in 128ms (next.js: 31ms, proxy.ts: 6ms, application-code: 91ms)
+ GET /explore 200 in 121ms (next.js: 32ms, proxy.ts: 5ms, application-code: 84ms)
+[?25h

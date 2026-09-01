@@ -18,6 +18,11 @@ export interface ParsedFile {
   headers: string[];
   rows: Record<string, string>[];
   totalRows: number;
+  /** Number of rows found inside the file that duplicated another row on a
+   *  company/email/website key. These are dropped during parsing. */
+  duplicateCount?: number;
+  /** Up to 5 of the duplicate keys found, for user-friendly messaging. */
+  duplicateSample?: string[];
 }
 
 export interface ImportRow {

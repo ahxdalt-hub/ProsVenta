@@ -5,4 +5,5 @@
 
 export * from "./types";
 export * from "./validate";
+export * from "./lifecycle";
 export { generateRecommendations } from "./engine";

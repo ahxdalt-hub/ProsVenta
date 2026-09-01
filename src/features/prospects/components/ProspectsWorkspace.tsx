@@ -3,19 +3,21 @@
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import type { Prospect, SavedList, SavedView } from "@/types/database";
-import type { ProspectFilters, ProspectSortField, SortOrder } from "@/features/prospects/types/query";
-import { DEFAULT_VIEWS } from "@/features/prospects/types/query";
-import { ProspectToolbar } from "./ProspectToolbar";
+import type { Prospect, SavedList } from "@/types/database";
+import type { ProspectSortField, SortOrder } from "../types/query";
 import { ProspectTable } from "./ProspectTable";
-import { FilterChips } from "./FilterChips";
-import { SavedViewBar } from "./SavedViewBar";
 import { ProspectPagination } from "./ProspectPagination";
 import { ProspectDetailPanel } from "./ProspectDetailPanel";
 import { CreateProspectDialog } from "./CreateProspectDialog";
+import { ProspectsToolbar, type ProspectToolbarFilters } from "./ProspectsToolbar";
 import { ProspectTableSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { createSavedViewAction, renameSavedViewAction, deleteSavedViewAction, duplicateSavedViewAction, toggleSavedViewPinAction, toggleProspectFavoriteAction } from "@/features/prospects/actions/saved-views";
+import { toggleProspectFavoriteAction } from "@/features/prospects/actions/saved-views";
+import { useIntelligenceActionWindow } from "@/features/intelligence/action-window";
+import { EnrichProspectWindow } from "@/features/enrichment/components/EnrichProspectWindow";
+import { BulkActionBar } from "./BulkActionBar";
+import { SaveToListDialog } from "./SaveToListDialog";
+import { BulkEnrichWindow } from "@/features/enrichment/components/BulkEnrichWindow";
 
 interface ProspectsWorkspaceProps {
   initialProspects: Prospect[];
@@ -29,10 +31,18 @@ interface ProspectsWorkspaceProps {
   owners: { id: string; full_name: string | null }[];
   sources: string[];
   savedLists: SavedList[];
-  savedViews: SavedView[];
-  currentFilters: ProspectFilters;
-  currentSort?: ProspectSortField;
-  currentOrder?: SortOrder;
+  /** Active search term (URL-owned; applied server-side by queryProspects). */
+  search: string;
+  /** Active filters (URL-owned; applied server-side by queryProspects). */
+  filters: ProspectToolbarFilters;
+  /** Active sort field ("" = default ordering). */
+  sort: ProspectSortField | "";
+  /** Active sort direction. */
+  order: SortOrder;
+  /** Automatic intelligence job states keyed by prospect id (Stage 5 Task 4). */
+  scoreStates?: Record<string, "pending" | "processing" | "failed">;
+  /** Plain-language message when the server data load failed. */
+  loadError?: string | null;
 }
 
 export function ProspectsWorkspace({
@@ -42,24 +52,22 @@ export function ProspectsWorkspace({
   totalPages,
   industries,
   countries,
-  tags,
-  owners,
+  tags: _tags,
+  owners: _owners,
   sources,
   savedLists,
-  savedViews,
-  currentFilters,
-  currentSort,
-  currentOrder,
+  search,
+  filters,
+  sort,
+  order,
+  scoreStates,
+  loadError,
 }: ProspectsWorkspaceProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
-
-  // Local search state for instant feedback
-  const [searchTerm, setSearchTerm] = useState(currentFilters.search ?? "");
-  const [isSearching, setIsSearching] = useState(false);
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { openIntelligenceAction } = useIntelligenceActionWindow();
 
   // Detail panel state
   const [selectedProspectId, setSelectedProspectId] = useState<string | null>(null);
@@ -67,263 +75,80 @@ export function ProspectsWorkspace({
   // Create prospect dialog state
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
-  // Active view tracking - derived from URL for persistence
-  const activeViewId = searchParams.get("view");
-
-  // Keep local search in sync with URL
+  // Row selection (bulk actions). Selection is per-page and resets whenever
+  // the underlying page data changes (search / filter / pagination).
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  const [showSaveToList, setShowSaveToList] = useState(false);
+  // Bulk enrichment window (Phase 3) — opened from the bulk action bar.
+  const [showBulkEnrich, setShowBulkEnrich] = useState(false);
   useEffect(() => {
-    const urlSearch = searchParams.get("search") ?? "";
-    if (urlSearch !== searchTerm) {
-      setSearchTerm(urlSearch);
+    setSelectedIds(new Set());
+    setShowSaveToList(false);
+  }, [initialProspects]);
+
+  // Recent-import indicator (arrives via ?recent_import=1 from the Import flow).
+  // The server navigation already returned refreshed data; this banner just
+  // confirms the just-imported prospects are now part of this workspace. It is
+  // never a full-page reload and never navigates away from Prospects.
+  const [recentImportBanner, setRecentImportBanner] = useState(
+    () => searchParams.get("recent_import") === "1"
+  );
+
+  // Stage 5 Task 4: manual retry of failed intelligence processing.
+  const handleRetryIntelligence = useCallback(
+    (prospectId: string) => {
+      import("@/features/prospects/actions/manage").then(({ retryIntelligenceAction }) =>
+        retryIntelligenceAction(prospectId).then(() => {
+          // The pipeline runs after the request; refresh once it revalidates.
+          router.refresh();
+        })
+      );
+    },
+    [router]
+  );
+
+  // Deep-link support: /dashboard/prospects?prospect=<id> opens the existing
+  // detail panel directly (used by the Intelligence Command Center).
+  // Handled once on mount; closing the panel strips the param from the URL.
+  const deepLinkHandledRef = useRef(false);
+  useEffect(() => {
+    if (deepLinkHandledRef.current) return;
+    deepLinkHandledRef.current = true;
+    const prospectParam = searchParams.get("prospect");
+    if (prospectParam) {
+      setSelectedProspectId(prospectParam);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  // Show searching indicator when URL changes
-  useEffect(() => {
-    if (isPending) {
-      setIsSearching(true);
-    } else {
-      const timer = setTimeout(() => setIsSearching(false), 150);
-      return () => clearTimeout(timer);
-    }
-  }, [isPending]);
-
-  const updateParams = useCallback(
-    (changes: Record<string, string | null>) => {
-      const params = new URLSearchParams(searchParams.toString());
-
-      Object.entries(changes).forEach(([key, value]) => {
-        if (value === null || value === "") {
-          params.delete(key);
-        } else {
-          params.set(key, value);
-        }
-      });
-
-      // Reset to page 1 on any filter/search/sort change
-      if (!("page" in changes)) {
-        params.delete("page");
-      }
-
-      const qs = params.toString();
-      startTransition(() => {
-        router.push(qs ? `${pathname}?${qs}` : pathname);
-      });
-    },
-    [searchParams, pathname, router]
-  );
-
-  const handleSearchChange = useCallback(
-    (value: string) => {
-      setSearchTerm(value);
-      setIsSearching(true);
-      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-      searchTimerRef.current = setTimeout(() => {
-        updateParams({ search: value || null });
-      }, 300);
-    },
-    [updateParams]
-  );
-
-  const handleClearSearch = useCallback(() => {
-    setSearchTerm("");
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    updateParams({ search: null });
-  }, [updateParams]);
-
-  const handleClearAll = useCallback(() => {
-    setSearchTerm("");
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    startTransition(() => {
-      router.push(pathname);
-    });
-  }, [pathname, router]);
-
-  const handleFiltersChange = useCallback(
-    (filters: ProspectFilters) => {
-      const changes: Record<string, string | null> = {
-        industry: filters.industry ?? null,
-        country: filters.country ?? null,
-        status: filters.status ?? null,
-        source: filters.source ?? null,
-        priority: filters.priority ?? null,
-        search: filters.search ?? null,
-        tags: filters.tags && filters.tags.length > 0 ? filters.tags.join(",") : null,
-        buying_intent: filters.buying_intent ?? null,
-        owner: filters.owner ?? null,
-        lead_score: filters.lead_score !== undefined ? String(filters.lead_score) : null,
-        ai_fit_score: filters.ai_fit_score !== undefined ? String(filters.ai_fit_score) : null,
-        revenue: filters.revenue !== undefined ? String(filters.revenue) : null,
-        employee_count: filters.employee_count !== undefined ? String(filters.employee_count) : null,
-        created_before: filters.created_before ?? null,
-        created_after: filters.created_after ?? null,
-        updated_before: filters.updated_before ?? null,
-        updated_after: filters.updated_after ?? null,
-        favorites_only: filters.favorites_only ? "true" : null,
-        quick_filter: filters.quick_filter ?? null,
-        conditions: filters.conditions && filters.conditions.length > 0 ? JSON.stringify(filters.conditions) : null,
-      };
-      updateParams(changes);
-    },
-    [updateParams]
-  );
-
-  const handleSort = useCallback(
-    (field: ProspectSortField) => {
-      const currentSortField = currentSort ?? "created_at";
-      const currentSortOrder = currentOrder ?? "desc";
-
-      if (currentSortField === field) {
-        // Toggle order
-        updateParams({
-          sort: field,
-          order: currentSortOrder === "asc" ? "desc" : "asc",
-        });
-      } else {
-        // New field, default to asc
-        updateParams({ sort: field, order: "asc" });
-      }
-    },
-    [currentSort, currentOrder, updateParams]
-  );
+  // ---- Search / filter / sort state -----------------------------------------
+  // Owned by the URL and applied server-side (see prospects/page.tsx). This
+  // component only renders the controls and receives the active values as
+  // props; it never queries Supabase directly.
 
   const handleRowClick = useCallback((prospectId: string) => {
+    // DEV-ONLY: trace the id handed to the detail panel (Phase 3 diagnostics).
+    if (process.env.NODE_ENV === "development") {
+      console.log("[WORKSPACE] selected prospect id:", JSON.stringify(prospectId));
+    }
     setSelectedProspectId(prospectId);
   }, []);
+
+  const handleCloseDetail = useCallback(() => {
+    setSelectedProspectId(null);
+    // Remove the deep-link param so refresh/back doesn't reopen the panel.
+    if (searchParams.get("prospect")) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("prospect");
+      const qs = params.toString();
+      startTransition(() => {
+        router.replace(qs ? `${pathname}?${qs}` : pathname);
+      });
+    }
+  }, [searchParams, pathname, router, startTransition]);
 
   const handleCreateSuccess = useCallback(() => {
     setShowCreateDialog(false);
   }, []);
-
-  // Saved view handlers
-  const handleSelectView = useCallback(
-    (viewId: string | null) => {
-      if (!viewId) {
-        // Reset to all - clear view param
-        const params = new URLSearchParams(searchParams.toString());
-        params.delete("view");
-        const qs = params.toString();
-        startTransition(() => {
-          router.push(qs ? `${pathname}?${qs}` : pathname);
-        });
-        return;
-      }
-
-      // Set view param for persistence
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("view", viewId);
-      params.delete("page");
-
-      // Default views
-      const defaultView = DEFAULT_VIEWS.find((v) => v.id === viewId);
-      if (defaultView) {
-        if (defaultView.filters) {
-          // Apply default view filters
-          const defaultFilters = defaultView.filters as ProspectFilters;
-          Object.entries(defaultFilters).forEach(([key, value]) => {
-            if (value !== null && value !== undefined && value !== "") {
-              params.set(key, String(value));
-            }
-          });
-        }
-        const qs = params.toString();
-        startTransition(() => {
-          router.push(qs ? `${pathname}?${qs}` : pathname);
-        });
-        return;
-      }
-
-      // Custom saved views
-      const savedView = savedViews.find((v) => v.id === viewId);
-      if (savedView) {
-        if (savedView.search) params.set("search", savedView.search);
-        if (savedView.sort_field) params.set("sort", savedView.sort_field);
-        if (savedView.sort_order) params.set("order", savedView.sort_order);
-        if (savedView.quick_filter) params.set("quick_filter", savedView.quick_filter);
-        if (savedView.favorites_only) params.set("favorites_only", "true");
-
-        // Apply saved filter conditions
-        const savedFilters = savedView.filters as Record<string, unknown>;
-        Object.entries(savedFilters).forEach(([key, value]) => {
-          if (value !== null && value !== undefined && value !== "") {
-            if (typeof value === "object") {
-              params.set(key, JSON.stringify(value));
-            } else {
-              params.set(key, String(value));
-            }
-          }
-        });
-
-        const qs = params.toString();
-        startTransition(() => {
-          router.push(qs ? `${pathname}?${qs}` : pathname);
-        });
-      }
-    },
-    [router, pathname, startTransition, savedViews, searchParams]
-  );
-
-  const handleSaveView = useCallback(
-    async (name: string) => {
-      const result = await createSavedViewAction({
-        name,
-        filters: currentFilters as Record<string, unknown>,
-        sort_field: currentSort ?? null,
-        sort_order: currentOrder ?? null,
-        search: currentFilters.search ?? null,
-        quick_filter: currentFilters.quick_filter ?? null,
-        favorites_only: currentFilters.favorites_only ?? false,
-        icon: "grid",
-        color: "blue",
-      });
-      if (!result.error && result.id) {
-        router.refresh();
-      }
-    },
-    [currentFilters, currentSort, currentOrder, router]
-  );
-
-  const handleRenameView = useCallback(
-    async (viewId: string, name: string) => {
-      await renameSavedViewAction(viewId, name);
-      router.refresh();
-    },
-    [router]
-  );
-
-  const handleDeleteView = useCallback(
-    async (viewId: string) => {
-      await deleteSavedViewAction(viewId);
-      if (activeViewId === viewId) {
-        const params = new URLSearchParams(searchParams.toString());
-        params.delete("view");
-        const qs = params.toString();
-        startTransition(() => {
-          router.push(qs ? `${pathname}?${qs}` : pathname);
-        });
-      } else {
-        router.refresh();
-      }
-    },
-    [router, pathname, activeViewId, startTransition, searchParams]
-  );
-
-  const handleDuplicateView = useCallback(
-    async (viewId: string) => {
-      await duplicateSavedViewAction(viewId);
-      router.refresh();
-    },
-    [router]
-  );
-
-  const handleTogglePin = useCallback(
-    async (viewId: string, isPinned: boolean) => {
-      await toggleSavedViewPinAction(viewId, isPinned);
-      router.refresh();
-    },
-    [router]
-  );
 
   const handleToggleFavorite = useCallback(
     async (prospectId: string, isFavorite: boolean) => {
@@ -333,108 +158,156 @@ export function ProspectsWorkspace({
     [router]
   );
 
-  const hasFilters = useMemo(() => {
-    const f = currentFilters;
-    return Boolean(
-      f.search ||
-      f.industry ||
-      f.country ||
-      f.status ||
-      f.source ||
-      f.priority ||
-      f.tags?.length ||
-      f.buying_intent ||
-      f.lead_score !== undefined ||
-      f.ai_fit_score !== undefined ||
-      f.revenue !== undefined ||
-      f.employee_count !== undefined ||
-      f.owner ||
-      f.favorites_only ||
-      f.quick_filter ||
-      f.conditions?.length
-    );
-  }, [currentFilters]);
+  const showEmptyState = initialProspects.length === 0;
 
-  // Determine if current state differs from the active saved view
-  const hasUnsavedChanges = useMemo(() => {
-    if (!activeViewId) return hasFilters;
-    return true; // When a view is active, any change is unsaved
-  }, [activeViewId, hasFilters]);
+  // ---- Selection / bulk actions -------------------------------------------
+  const handleToggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
-  const showEmptyState = initialProspects.length === 0 && !hasFilters;
-  const showNoResults = initialProspects.length === 0 && hasFilters;
+  const handleToggleAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      const allSelected =
+        initialProspects.length > 0 && initialProspects.every((p) => prev.has(p.id));
+      return allSelected ? new Set() : new Set(initialProspects.map((p) => p.id));
+    });
+  }, [initialProspects]);
+
+  const selection = useMemo(
+    () => ({
+      selectedIds,
+      onToggle: handleToggleSelect,
+      onToggleAll: handleToggleAll,
+      allSelected:
+        initialProspects.length > 0 && initialProspects.every((p) => selectedIds.has(p.id)),
+      someSelected: initialProspects.some((p) => selectedIds.has(p.id)),
+    }),
+    [selectedIds, handleToggleSelect, handleToggleAll, initialProspects]
+  );
+
+  // Single-prospect enrichment uses the dedicated Phase-2 Enrich Prospect
+  // window (ActionWindow architecture, provider calls only on explicit user
+  // action). Research still reuses the existing Intelligence action window.
+  const [enrichProspectId, setEnrichProspectId] = useState<string | null>(null);
+  const handleEnrich = useCallback((prospectId: string) => {
+    setEnrichProspectId(prospectId);
+  }, []);
+  const handleResearch = useCallback(
+    (prospectId: string) => openIntelligenceAction({ type: "research_prospect", context: { targetId: prospectId } }),
+    [openIntelligenceAction]
+  );
+
+  // Bulk enrichment entry point (Phase 3): opens the confirmation window for
+  // the current selection. The action only exists while prospects are selected.
+  const handleBulkEnrich = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    setShowBulkEnrich(true);
+  }, [selectedIds.size]);
 
   return (
-    <div className="dashboard-enter flex flex-col space-y-4 min-h-[calc(100vh-9rem)]">
+    // ps-page-height (md+): fills exactly the space between the topbar and the
+    // viewport bottom, so the page itself never scrolls — only the table area
+    // below does. On mobile (<md) no height is applied and the page keeps its
+    // natural document scroll.
+    <div className="dashboard-enter flex min-h-0 flex-col space-y-4 ps-page-height">
       {/* Page Header */}
-      <div className="flex flex-col gap-1.5">
+      <div className="flex shrink-0 flex-col gap-1.5">
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">
           Prospects
         </h1>
-        <p className="text-sm text-slate-500">
-          {total > 0
-            ? `${total} ${total === 1 ? "prospect" : "prospects"} in this view`
-            : "Find, organize, and manage your target prospects."}
+        <p className="max-w-3xl text-sm leading-relaxed text-slate-500">
+          Find, evaluate, and act on prospects that match your target market.
         </p>
       </div>
 
-      {/* Saved Views Bar */}
-      <div className="premium-card px-3 py-2">
-        <SavedViewBar
-          views={savedViews}
-          defaultViews={DEFAULT_VIEWS}
-          activeViewId={activeViewId}
-          onSelectView={handleSelectView}
-          onSaveView={handleSaveView}
-          onRenameView={handleRenameView}
-          onDeleteView={handleDeleteView}
-          onDuplicateView={handleDuplicateView}
-          onTogglePin={handleTogglePin}
-          hasUnsavedChanges={hasUnsavedChanges}
+      {/* Server load failure — isolated banner; the shell stays usable */}
+      {loadError && (
+        <div
+          role="alert"
+          className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          {loadError}
+        </div>
+      )}
+
+      {/* Recent-import confirmation (context preserved from the Import flow). */}
+      {recentImportBanner && (
+        <div
+          role="status"
+          className="flex shrink-0 items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-green-800"
+        >
+          <svg className="h-5 w-5 shrink-0 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <span className="min-w-0">
+            <span className="font-semibold">Recent import added.</span>{" "}
+            <span className="text-green-700">
+              Your imported prospects are now in this workspace — you can select
+              them and save them to a list.
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setRecentImportBanner(false);
+              const params = new URLSearchParams(searchParams.toString());
+              params.delete("recent_import");
+              const qs = params.toString();
+              startTransition(() => {
+                router.replace(qs ? `${pathname}?${qs}` : pathname);
+              });
+            }}
+            aria-label="Dismiss recent import notice"
+            className="ml-auto shrink-0 rounded-lg p-1.5 text-green-600 transition hover:bg-green-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Search / Filter / Sort toolbar + Add Prospect action.
+          Search, Filter and Sort are independent controls — each only mutates
+          its own URL params; the server shell combines them into one query. */}
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
+        <ProspectsToolbar
+          search={search}
+          filters={filters}
+          sort={sort}
+          order={order}
+          industries={industries}
+          countries={countries}
+          sources={sources}
         />
+        <button
+          type="button"
+          onClick={() => setShowCreateDialog(true)}
+          className="btn-press inline-flex items-center gap-1.5 rounded-lg bg-navy-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy-800 hover:shadow-md transition-all duration-150 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:outline-none"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          <span className="hidden sm:inline">Add Prospect</span>
+          <span className="sm:hidden">Add</span>
+        </button>
       </div>
 
-      {/* Premium Toolbar */}
-      <ProspectToolbar
-        searchTerm={searchTerm}
-        onSearchChange={handleSearchChange}
-        onClearSearch={handleClearSearch}
-        isSearching={isSearching}
-        industries={industries}
-        countries={countries}
-        tags={tags}
-        owners={owners}
-        sources={sources}
-        currentFilters={currentFilters}
-        onFilterChange={updateParams}
-        onFiltersChange={handleFiltersChange}
-        onClearAll={handleClearAll}
-        hasFilters={hasFilters}
-        currentSort={currentSort}
-        currentOrder={currentOrder}
-        onSort={handleSort}
-        onCreateClick={() => setShowCreateDialog(true)}
-      />
+      {/* Results summary — real server counts only */}
+      {!isPending && !loadError && (
+        <p className="shrink-0 text-xs font-medium tabular-nums text-slate-500" aria-live="polite">
+          {total} {total === 1 ? "prospect" : "prospects"}
+        </p>
+      )}
 
-      {/* Active Filter Chips */}
-      <AnimatePresence>
-        {hasFilters && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          >
-            <FilterChips
-              filters={currentFilters}
-              onRemove={updateParams}
-              onClearAll={handleClearAll}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Table / Loading / Empty State */}
+      {/* Table / Loading / Error / Empty State */}
       <AnimatePresence mode="wait">
         {isPending ? (
           <motion.div
@@ -446,6 +319,31 @@ export function ProspectsWorkspace({
           >
             <ProspectTableSkeleton />
           </motion.div>
+        ) : loadError ? (
+          <motion.div
+            key="load-error"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="premium-card flex flex-1 items-center justify-center min-h-[400px] md:min-h-0"
+          >
+            <EmptyState
+              title="Something went wrong"
+              description={loadError}
+              icon={
+                <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+              }
+              action={{
+                label: "Retry",
+                onClick: () => router.refresh(),
+              }}
+            />
+          </motion.div>
         ) : showEmptyState ? (
           <motion.div
             key="empty"
@@ -453,7 +351,7 @@ export function ProspectsWorkspace({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="premium-card flex-1 flex items-center justify-center min-h-[400px]"
+            className="premium-card flex flex-1 items-center justify-center min-h-[400px] md:min-h-0"
           >
             <EmptyState
               title="No prospects yet"
@@ -469,30 +367,6 @@ export function ProspectsWorkspace({
               }}
             />
           </motion.div>
-        ) : showNoResults ? (
-          <motion.div
-            key="no-results"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="premium-card flex-1 flex items-center justify-center min-h-[400px]"
-          >
-            <EmptyState
-              title="No prospects found"
-              description="Try adjusting your filters, clearing conditions, or creating a new view to find what you're looking for."
-              icon={
-                <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-              }
-              action={{
-                label: "Clear filters",
-                onClick: handleClearAll,
-              }}
-            />
-          </motion.div>
         ) : (
           <motion.div
             key="table"
@@ -505,29 +379,41 @@ export function ProspectsWorkspace({
             <ProspectTable
               prospects={initialProspects}
               onRowClick={handleRowClick}
-              currentSort={currentSort}
-              currentOrder={currentOrder}
-              onSort={handleSort}
               onToggleFavorite={handleToggleFavorite}
+              scoreStates={scoreStates}
+              onRetryIntelligence={handleRetryIntelligence}
+              selection={selection}
+              onEnrich={handleEnrich}
+              onResearch={handleResearch}
+              onSaveToList={(id) => {
+                setSelectedIds(new Set([id]));
+                setShowSaveToList(true);
+              }}
             />
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Pagination */}
+      {/* Pagination — pinned below the scroll area so it stays reachable */}
       {!isPending && initialProspects.length > 0 && (
-        <ProspectPagination
-          currentPage={page}
-          totalPages={totalPages}
-          total={total}
-        />
+        <div className="shrink-0">
+          <ProspectPagination
+            currentPage={page}
+            totalPages={totalPages}
+            total={total}
+          />
+        </div>
       )}
 
       {/* Detail Panel (Slide-over) */}
       <ProspectDetailPanel
         prospectId={selectedProspectId}
-        onClose={() => setSelectedProspectId(null)}
+        onClose={handleCloseDetail}
         savedLists={savedLists}
+        onDeleted={() => {
+          setSelectedProspectId(null);
+          router.refresh();
+        }}
       />
 
       {/* Create Prospect Dialog */}
@@ -535,6 +421,39 @@ export function ProspectsWorkspace({
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
         onSuccess={handleCreateSuccess}
+      />
+
+      {/* Bulk action bar + Save-to-List dialog (no navigation away) */}
+      <BulkActionBar
+        selectedCount={selectedIds.size}
+        onSaveToList={() => setShowSaveToList(true)}
+        onEnrich={handleBulkEnrich}
+        onResearch={() => openIntelligenceAction({ type: "research_prospect" })}
+        onClear={() => setSelectedIds(new Set())}
+      />
+      <SaveToListDialog
+        open={showSaveToList && selectedIds.size > 0}
+        onClose={() => setShowSaveToList(false)}
+        prospectIds={Array.from(selectedIds)}
+        savedLists={savedLists}
+        onComplete={() => setSelectedIds(new Set())}
+      />
+
+      {/* Single-prospect enrichment window (Phase 2) — opens over this page
+          without navigation; underlying search/filter state is preserved. */}
+      <EnrichProspectWindow
+        prospectId={enrichProspectId}
+        open={enrichProspectId !== null}
+        onClose={() => setEnrichProspectId(null)}
+      />
+
+      {/* Bulk enrichment window (Phase 3) — confirmation → progress → summary;
+          processing runs server-side, so minimizing/closing never stops it. */}
+      <BulkEnrichWindow
+        open={showBulkEnrich && selectedIds.size > 0}
+        prospectIds={Array.from(selectedIds)}
+        onClose={() => setShowBulkEnrich(false)}
+        onCompleted={() => router.refresh()}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-﻿"use server";
+"use server";
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -74,7 +74,7 @@ export async function updateMemberRoleAction(memberId: string, role: Organizatio
     const ok = await updateMemberRole(memberId, role);
     if (!ok) { return { error: "Couldn't update this role." }; }
     revalidatePath("/dashboard/organization");
-    revalidatePath("/dashboard/organization/members");
+    revalidatePath("/dashboard/organization");
     return { error: null };
   } catch {
     return { error: "Couldn't update this role." };
@@ -121,7 +121,7 @@ export async function removeMemberAction(memberId: string): Promise<{ error: str
     const ok = await removeMember(memberId);
     if (!ok) { return { error: "That member could not be removed." }; }
     revalidatePath("/dashboard/organization");
-    revalidatePath("/dashboard/organization/members");
+    revalidatePath("/dashboard/organization");
     return { error: null };
   } catch {
     return { error: "That member could not be removed." };

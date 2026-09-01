@@ -9,6 +9,7 @@
 
 import type { IntelligenceErrorCode } from "./errors";
 import type { CompanyResearchResult } from "./research/types";
+import type { ProviderCapability } from "./capabilities";
 
 // ============================================================================
 // Intelligence Operations
@@ -18,7 +19,8 @@ export type IntelligenceOperation =
   | "prospect_enrichment"
   | "company_research"
   | "prospect_research"
-  | "signals";
+  | "signals"
+  | "intelligence_generation";
 
 export const INTELLIGENCE_OPERATIONS: IntelligenceOperation[] = [
   "company_enrichment",
@@ -26,6 +28,7 @@ export const INTELLIGENCE_OPERATIONS: IntelligenceOperation[] = [
   "company_research",
   "prospect_research",
   "signals",
+  "intelligence_generation",
 ];
 
 export const INTELLIGENCE_OPERATION_LABELS: Record<IntelligenceOperation, string> = {
@@ -34,6 +37,7 @@ export const INTELLIGENCE_OPERATION_LABELS: Record<IntelligenceOperation, string
   company_research: "Company Research",
   prospect_research: "Prospect Research",
   signals: "Signals",
+  intelligence_generation: "Intelligence Generation",
 };
 
 // ============================================================================
@@ -76,6 +80,11 @@ export interface IntelligenceProviderConfig {
   enabled: boolean;
   /** Operations this provider supports */
   supportedOperations: IntelligenceOperation[];
+  /**
+   * Granular capabilities this provider declares (Stage 6). When omitted,
+   * capabilities are derived from supportedOperations.
+   */
+  capabilities?: ProviderCapability[];
 }
 
 // ============================================================================
@@ -261,6 +270,17 @@ export interface ProspectEnrichmentRecord {
   raw: Record<string, unknown> | null;
   confidence: number | null;
   enriched_at: string | null;
+  /**
+   * The provider's own stable person identifier, when legitimately returned.
+   * Used for idempotent refresh — never invented by Prosventa.
+   */
+  provider_person_id: string | null;
+  /** Data origin: 'provider' | 'user' | 'derived' (Stage 6 - Phase 3 provenance) */
+  source: "provider" | "user" | "derived";
+  /** When this person was FIRST enriched (provenance anchor; never changes on refresh) */
+  first_retrieved_at: string | null;
+  /** When the stored data was last refreshed */
+  last_retrieved_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -276,6 +296,10 @@ export interface ProspectEnrichmentRecordInsert {
   raw?: Record<string, unknown> | null;
   confidence?: number | null;
   enriched_at?: string | null;
+  provider_person_id?: string | null;
+  source?: "provider" | "user" | "derived";
+  first_retrieved_at?: string | null;
+  last_retrieved_at?: string | null;
 }
 
 export interface ProspectEnrichmentRecordUpdate {
@@ -303,6 +327,34 @@ export interface ProspectEnrichmentOperationResult {
   provider: string;
   enrichedAt: string | null;
   identityUsed: ProspectIdentityStrength | null;
+  /**
+   * Decision-maker relevance assessment (Stage 6 - Phase 3). Present when the
+   * stored data supports an evidence-based judgement — never fabricated.
+   */
+  relevance?: PersonRelevanceAssessment | null;
+  /** Data-quality warnings surfaced to the user (partial provider results) */
+  warnings?: string[];
+  /** True when a duplicate request was blocked (job already in progress) */
+  alreadyInProgress?: boolean;
+  /** True when fresh stored data was reused without a provider call */
+  usedCached?: boolean;
+}
+
+// ============================================================================
+// Decision-Maker Relevance (Stage 6 - Phase 3)
+// ============================================================================
+// Evidence-based categorisation of how relevant a person is as a decision
+// maker for the customer's sales workflow. Derived deterministically from the
+// enriched person data (seniority / department / title). "unknown" is used
+// whenever the available evidence does not support a confident judgement.
+// ============================================================================
+
+export type PersonDecisionMakerRelevance = "high" | "medium" | "low" | "unknown";
+
+export interface PersonRelevanceAssessment {
+  level: PersonDecisionMakerRelevance;
+  /** Human-readable reasons grounded in the actual person data */
+  reasons: string[];
 }
 
 // ============================================================================
@@ -412,6 +464,10 @@ export interface CompanyEnrichmentRecord {
   raw: Record<string, unknown> | null;
   confidence: number | null;
   enriched_at: string | null;
+  /** When this prospect/domain was FIRST enriched (provenance anchor; never changes on refresh) */
+  first_retrieved_at: string | null;
+  /** When the stored data was last refreshed */
+  last_retrieved_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -428,6 +484,8 @@ export interface CompanyEnrichmentRecordInsert {
   raw?: Record<string, unknown> | null;
   confidence?: number | null;
   enriched_at?: string | null;
+  first_retrieved_at?: string | null;
+  last_retrieved_at?: string | null;
 }
 
 export interface CompanyEnrichmentRecordUpdate {
@@ -500,6 +558,25 @@ export interface IntelligenceJob {
   max_attempts: number;
   started_at: string | null;
   completed_at: string | null;
+  /**
+   * Stage 6 Phase 6: orchestration metadata (trigger, priority, per-operation
+   * outcomes, final pipeline state). Never contains provider credentials.
+   */
+  metadata?: Record<string, unknown> | null;
+  /**
+   * Feature 2 Phase 1: enrichment traceability + idempotency.
+   * idempotency_key is unique (partial index) — repeated requests within a
+   * window collapse into one logical operation.
+   */
+  idempotency_key?: string | null;
+  /** Structured failure category (see features/enrichment/operations.ts). */
+  error_category?: string | null;
+  /** What the caller asked to enrich. */
+  fields_requested?: string[] | null;
+  /** What the provider actually returned. */
+  fields_returned?: string[] | null;
+  /** Observed execution time in milliseconds. */
+  duration_ms?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -515,6 +592,8 @@ export interface IntelligenceJobInsert {
   error_message?: string | null;
   attempt_count?: number;
   max_attempts?: number;
+  idempotency_key?: string | null;
+  fields_requested?: string[] | null;
 }
 
 export interface IntelligenceJobUpdate {
@@ -524,6 +603,9 @@ export interface IntelligenceJobUpdate {
   attempt_count?: number;
   started_at?: string | null;
   completed_at?: string | null;
+  error_category?: string | null;
+  fields_returned?: string[] | null;
+  duration_ms?: number | null;
 }
 
 // ============================================================================
@@ -545,4 +627,36 @@ export interface IntelligenceUsageInsert {
   operation: IntelligenceOperation;
   provider: string;
   status?: IntelligenceUsageStatus;
+  /**
+   * Provider-reported usage/cost metadata (Stage 6 credit preparation).
+   * Only populated when the provider actually reports it — never invented.
+   * Stage 8 (Credits) will consume this for cost accounting.
+   */
+  usage_metadata?: ProviderUsageMetadata | null;
+  /** Reasoning model id, when applicable (Feature 4 Phase 1). */
+  model?: string | null;
+  /** Compact serialized reasoning input size in characters. */
+  input_size?: number | null;
+  /** Compact serialized output size in characters. */
+  output_size?: number | null;
+  /** Observed execution time in milliseconds. */
+  duration_ms?: number | null;
+}
+
+/**
+ * Provider cost/usage metadata placeholder for future credit accounting
+ * (Stage 8). Providers that do not report cost information leave this null.
+ */
+export interface ProviderUsageMetadata {
+  /** Provider's own request identifier, when available */
+  requestId?: string | null;
+  /** Credits/units the provider charged, when reported */
+  creditsUsed?: number | null;
+  /** Free-form provider-reported metrics (numbers only) */
+  metrics?: Record<string, number>;
+  /**
+   * Machine-readable failure classification for FAILED operations
+   * (Feature 4 Phase 4 observability). Codes only — never payloads.
+   */
+  failureCode?: string | null;
 }

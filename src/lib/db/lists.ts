@@ -102,19 +102,43 @@ export async function getSavedListItems(
 
 /**
  * Adds a prospect to a saved list.
+ * Idempotent: re-adding an existing member is NOT an error (the DB enforces
+ * uniqueness via unique_list_prospect; we upsert with ignoreDuplicates so
+ * double-submissions and repeat saves succeed harmlessly).
  */
 export async function addToList(
   input: SavedListItemInsert
 ): Promise<SavedListItem | null> {
   const supabase = await createClient();
 
-  const { data: item } = await supabase
+  const { data: items } = await supabase
     .from("saved_list_items")
-    .insert(input)
+    .upsert(input, { onConflict: "list_id,prospect_id", ignoreDuplicates: true })
     .select()
-    .single();
+    .limit(1);
 
-  return item;
+  // No row returned means the prospect was already a member — not a failure.
+  return items?.[0] ?? null;
+}
+
+/**
+ * Adds MULTIPLE prospects to a saved list in ONE statement.
+ * Idempotent (existing members are skipped, not errors) — protects against
+ * double-submission and duplicate memberships in a single round trip.
+ */
+export async function addToListMany(
+  listId: string,
+  prospectIds: string[]
+): Promise<boolean> {
+  if (prospectIds.length === 0) return true;
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("saved_list_items").upsert(
+    prospectIds.map((prospect_id) => ({ list_id: listId, prospect_id })),
+    { onConflict: "list_id,prospect_id", ignoreDuplicates: true }
+  );
+
+  return !error;
 }
 
 /**
@@ -181,4 +205,86 @@ export async function getSavedListWithProspects(
     .order("created_at", { ascending: false });
 
   return { list, prospects: prospects ?? [] };
+}
+
+/**
+ * Retrieves every saved list with its prospect count embedded in ONE query
+ * (saved_list_items(count) aggregation — no per-list round trips).
+ * Ordered by updated_at so recently touched lists surface first.
+ */
+export async function getSavedListsWithCounts(): Promise<
+  (SavedList & { prospect_count: number })[]
+> {
+  const supabase = await createClient();
+
+  const { data: lists } = await supabase
+    .from("saved_lists")
+    .select("*, saved_list_items(count)")
+    .order("updated_at", { ascending: false });
+
+  return (lists ?? []).map((list) => ({
+    ...list,
+    prospect_count: Array.isArray(list.saved_list_items)
+      ? (list.saved_list_items[0]?.count ?? 0)
+      : 0,
+  }));
+}
+
+/**
+ * Retrieves the members of a saved list WITH their embedded ICP scores so the
+ * list detail workspace can reuse the shared ProspectTable without N+1 lookups.
+ * RLS ensures the list belongs to the user's organization.
+ */
+export async function getSavedListMembers(
+  listId: string
+): Promise<{ list: SavedList | null; prospects: Prospect[] }> {
+  const supabase = await createClient();
+
+  const list = await getSavedList(listId);
+  if (!list) {
+    return { list: null, prospects: [] };
+  }
+
+  const { data: items } = await supabase
+    .from("saved_list_items")
+    .select("prospect_id")
+    .eq("list_id", listId)
+    .order("created_at", { ascending: false });
+
+  const prospectIds = (items ?? []).map((item) => item.prospect_id);
+  if (prospectIds.length === 0) {
+    return { list, prospects: [] };
+  }
+
+  const { data: prospects } = await supabase
+    .from("prospects")
+    .select("*, prospect_scores(score, category)")
+    .in("id", prospectIds);
+
+  // Preserve the membership order (most recently added first).
+  const byId = new Map((prospects ?? []).map((p) => [p.id, p]));
+  return {
+    list,
+    prospects: prospectIds.map((id) => byId.get(id)).filter(Boolean) as Prospect[],
+  };
+}
+
+/**
+ * Removes multiple prospects from a saved list in ONE delete statement.
+ * Only removes memberships — underlying prospects are never deleted.
+ */
+export async function removeFromListMany(
+  listId: string,
+  prospectIds: string[]
+): Promise<boolean> {
+  if (prospectIds.length === 0) return true;
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("saved_list_items")
+    .delete()
+    .eq("list_id", listId)
+    .in("prospect_id", prospectIds);
+
+  return !error;
 }

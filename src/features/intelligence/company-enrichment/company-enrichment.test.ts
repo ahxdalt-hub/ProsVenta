@@ -16,6 +16,10 @@ import { detectPartialResult } from "./partial";
 import { shouldCreateJob, shouldUseExistingEnrichment } from "../job-state";
 import { toIntelligenceError, IntelligenceError } from "../errors";
 import { mockIntelligenceProvider, MOCK_PROVIDER_ID } from "../providers/mock";
+import {
+  getCompanyEnrichmentProvider,
+  resolveCompanyEnrichmentProviderId,
+} from "../providers/company-enrichment";
 import type { CompanyEnrichmentResult } from "../types";
 
 let passed = 0;
@@ -226,6 +230,31 @@ async function run() {
   assert("mock returns domain", companyA.domain === "acme.com");
   assert("mock returns technologies", companyA.technologies.length > 0);
   assert("mock provider id", mockIntelligenceProvider.getConfig().id === MOCK_PROVIDER_ID);
+
+  // ==========================================================================
+  // 8. Stage 6 — Phase 2: Honest Provider Configuration
+  // ==========================================================================
+  // No real provider credentials exist in this environment, so the engine must
+  // resolve the default id and report PROVIDER_NOT_CONFIGURED for any
+  // unregistered adapter. Data is never fabricated.
+  console.log("Provider Configuration (Stage 6 - Phase 2):");
+  delete process.env.INTELLIGENCE_COMPANY_PROVIDER;
+  const defaultId = await resolveCompanyEnrichmentProviderId("");
+  assert("falls back to default id without env/org config", defaultId === "company-enrichment");
+
+  process.env.INTELLIGENCE_COMPANY_PROVIDER = "clearbit";
+  const envId = await resolveCompanyEnrichmentProviderId("");
+  assert("env provider id is honored", envId === "clearbit");
+  delete process.env.INTELLIGENCE_COMPANY_PROVIDER;
+
+  let threwNotConfigured = false;
+  try {
+    getCompanyEnrichmentProvider("clearbit");
+  } catch (err) {
+    threwNotConfigured =
+      err instanceof IntelligenceError && err.code === "PROVIDER_NOT_CONFIGURED";
+  }
+  assert("unregistered provider reports PROVIDER_NOT_CONFIGURED", threwNotConfigured);
 
   // ==========================================================================
   console.log("\n" + "-".repeat(60));

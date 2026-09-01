@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -6,6 +6,7 @@ import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { researchProspectCompany, getStoredCompanyResearch } from "../research/actions";
+import { CreditCostBadge, InsufficientCreditsNotice, getBillingInfo } from "@/components/dashboard/credits/CreditCostBadge";
 import type {
   CompanyResearchOperationResult,
   CompanyResearchRecord,
@@ -15,10 +16,10 @@ import type {
 
 // ============================================================================
 // Company Research Section
-// Stage 4 — Phase 4: AI Company Research
+// Stage 4 â€” Phase 4: AI Company Research
 // ============================================================================
 // Displays the grounded company research brief and provides the explicit
-// "Research Company" action. Never runs research on page load — only on an
+// "Research Company" action. Never runs research on page load â€” only on an
 // explicit user action. Cached results are displayed without AI calls.
 // ============================================================================
 
@@ -34,7 +35,7 @@ export function CompanyResearchSection({ prospectId, hasDomain }: CompanyResearc
   const [isLoadingCached, setIsLoadingCached] = useState(true);
   const [isResearching, setIsResearching] = useState(false);
 
-  // Load cached research on mount — does NOT run AI.
+  // Load cached research on mount â€” does NOT run AI.
   useEffect(() => {
     let cancelled = false;
     setIsLoadingCached(true);
@@ -46,7 +47,7 @@ export function CompanyResearchSection({ prospectId, hasDomain }: CompanyResearc
         if (!cancelled) setRecord(stored);
       })
       .catch(() => {
-        // Ignore — cached research is best-effort.
+        // Ignore â€” cached research is best-effort.
       })
       .finally(() => {
         if (!cancelled) setIsLoadingCached(false);
@@ -94,7 +95,7 @@ export function CompanyResearchSection({ prospectId, hasDomain }: CompanyResearc
   return (
     <div className="space-y-3">
       {/* Action Buttons */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <Button
           size="sm"
           onClick={() => handleResearch(false)}
@@ -112,6 +113,14 @@ export function CompanyResearchSection({ prospectId, hasDomain }: CompanyResearc
           >
             Refresh
           </Button>
+        )}
+        <CreditCostBadge operationKey="company_research" compact />
+        {getBillingInfo(operation)?.code === "INSUFFICIENT_CREDITS" && (
+          <InsufficientCreditsNotice
+            required={getBillingInfo(operation)?.required}
+            available={getBillingInfo(operation)?.balance}
+            compact
+          />
         )}
       </div>
 
@@ -228,7 +237,7 @@ function ResearchResultView({
       {result.notableInfo && result.notableInfo.length > 0 && (
         <ResearchBlock
           label="Notable Information"
-          content={result.notableInfo.join(" · ")}
+          content={result.notableInfo.join(" Â· ")}
         />
       )}
 
@@ -249,8 +258,8 @@ function ResearchResultView({
         <SourceList sources={result.sources ?? []} />
         <p className="text-xs text-slate-400">
           Provider: {provider}
-          {model && ` · Model: ${model}`}
-          {researchedAt && ` · Researched: ${formatDate(researchedAt)}`}
+          {model && ` Â· Model: ${model}`}
+          {researchedAt && ` Â· Researched: ${formatDate(researchedAt)}`}
         </p>
         {hasExternal ? (
           <p className="text-xs text-slate-500">
@@ -306,3 +315,4 @@ function SourceList({ sources }: { sources: ResearchSource[] }) {
     </ul>
   );
 }
+

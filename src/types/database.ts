@@ -356,6 +356,8 @@ export interface Prospect {
   buying_intent: BuyingIntent;
   revenue: number | null;
   owner_id: string | null;
+  /** Stable provider identifier from discovery (e.g. Apollo person id). */
+  provider_lead_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -387,6 +389,7 @@ export interface ProspectInsert {
   buying_intent?: BuyingIntent;
   revenue?: number | null;
   owner_id?: string | null;
+  provider_lead_id?: string | null;
 }
 
 export interface ProspectUpdate {
@@ -762,6 +765,26 @@ export interface Database {
         Insert: Partial<AutomationSuggestionRow>;
         Update: Partial<AutomationSuggestionRow>;
       };
+      plans: {
+        Row: import("./database").PlanCatalogRow;
+        Insert: Partial<import("./database").PlanCatalogRow>;
+        Update: Partial<import("./database").PlanCatalogRow>;
+      };
+      plan_entitlements: {
+        Row: import("./database").PlanEntitlementRow;
+        Insert: Partial<import("./database").PlanEntitlementRow>;
+        Update: Partial<import("./database").PlanEntitlementRow>;
+      };
+      organization_subscriptions: {
+        Row: import("./database").OrganizationSubscriptionRecord;
+        Insert: Partial<import("./database").OrganizationSubscriptionRecord>;
+        Update: Partial<import("./database").OrganizationSubscriptionRecord>;
+      };
+      subscription_history: {
+        Row: import("./database").SubscriptionHistoryRecord;
+        Insert: Partial<import("./database").SubscriptionHistoryRecord>;
+        Update: Record<string, never>; // append-only
+      };
     };
     Functions: {
       handle_new_user: {
@@ -785,3 +808,146 @@ export type ThemeOption = 'system' | 'light' | 'dark';
 // Timezone Type Helper
 // ============================================================================
 export type TimezoneOption = string;
+
+// ============================================================================
+// Prosventa Credits — Wallet & Ledger
+// Stage 8 — Phase 1: Prosventa Credits Architecture
+// ============================================================================
+// Mirrors org_credit_balances (wallet) and credit_transactions (ledger).
+// Canonical detailed types live in src/features/credits/types.ts; these are
+// the database-shaped types for Supabase queries.
+
+export interface CreditWalletRow {
+  id: string;
+  organization_id: string;
+  /** AVAILABLE credits (excludes reservations). Never negative. */
+  balance: number;
+  /** Credits held for in-flight operations. Never negative. */
+  reserved: number;
+  lifetime_purchased: number;
+  lifetime_granted: number;
+  lifetime_consumed: number;
+  monthly_allowance: number;
+  month_key: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Signed-amount ledger entry. Positive = added, negative = removed. */
+export interface CreditTransactionRow {
+  id: string;
+  organization_id: string;
+  wallet_id: string | null;
+  user_id: string;
+  feature_id: string;
+  amount: number;
+  type:
+    | "grant"
+    | "purchase"
+    | "consumption"
+    | "refund"
+    | "adjustment"
+    | "expiration"
+    | "reservation"
+    | "release"
+    | "deduction"
+    | "topup";
+  description: string;
+  source: string | null;
+  reference_type: string | null;
+  reference_id: string | null;
+  metadata: Record<string, unknown>;
+  idempotency_key: string | null;
+  created_at: string;
+}
+
+// ============================================================================
+// Prosventa Credits � Usage Records
+// Stage 8 � Phase 2: Credit Consumption + Usage Tracking
+// ============================================================================
+export interface CreditUsageRecord {
+  id: string;
+  organization_id: string;
+  actor_id: string | null;
+  operation_key: string;
+  category: string;
+  credit_amount: number;
+  status: "pending" | "completed" | "failed" | "refunded" | "cancelled";
+  prospect_id: string | null;
+  company_domain: string | null;
+  reference_id: string;
+  execution_id: string | null;
+  provider: string | null;
+  ledger_transaction_id: string | null;
+  metadata: Record<string, unknown>;
+  idempotency_key: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================================
+// Prosventa Plans, Limits + Organization Billing
+// Stage 8 — Phase 3: Plan & Entitlement Foundation
+// ============================================================================
+// Database-shaped types mirroring public.plans, public.plan_entitlements,
+// public.organization_subscriptions and public.subscription_history.
+// Canonical service types live in src/features/plans/types.ts.
+
+export type SubscriptionPlanStatus = "active" | "inactive" | "deprecated";
+
+export interface PlanCatalogRow {
+  key: string;
+  name: string;
+  description: string;
+  status: SubscriptionPlanStatus;
+  display_order: number;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export type EntitlementLimitType = "integer" | "boolean" | "unlimited";
+export type EntitlementResetPeriod = "never" | "monthly" | "daily";
+
+export interface PlanEntitlementRow {
+  id: string;
+  plan_key: string;
+  key: string;
+  limit_type: EntitlementLimitType;
+  value: number;
+  reset_period: EntitlementResetPeriod;
+  created_at: string;
+}
+
+export type BillingStatus =
+  | "active"
+  | "trialing"
+  | "past_due"
+  | "cancelled"
+  | "suspended";
+
+export interface OrganizationSubscriptionRecord {
+  organization_id: string;
+  plan_key: string;
+  billing_status: BillingStatus;
+  billing_interval: "monthly" | "yearly" | null;
+  period_start: string | null;
+  period_end: string | null;
+  provider_customer_id: string | null;
+  provider_subscription_id: string | null;
+  limit_exceeded: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubscriptionHistoryRecord {
+  id: string;
+  organization_id: string;
+  from_plan_key: string | null;
+  to_plan_key: string;
+  reason: string;
+  changed_by: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+

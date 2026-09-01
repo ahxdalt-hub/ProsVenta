@@ -9,7 +9,6 @@ export const ROUTE_STATUS_TEXT: Record<string, string> = {
   "/dashboard/saved-lists": "Opening saved lists...",
   "/dashboard/analytics": "Opening analytics...",
   "/dashboard/organization": "Updating organization...",
-  "/dashboard/organization/members": "Loading members...",
   "/dashboard/settings": "Updating settings...",
   "/dashboard/help": "Opening help...",
 };

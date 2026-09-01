@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getSignedAvatarUrls } from "@/lib/db/profiles";
 import type {
   Organization,
   OrganizationMember,
@@ -81,12 +82,29 @@ export async function ensureOrganization(): Promise<Organization | null> {
 
   if (orgError || !org) return null;
 
-  // Create the owner membership
-  await supabase.from("organization_members").insert({
-    organization_id: org.id,
-    user_id: user.id,
-    role: "owner",
-  });
+  // Create the owner membership. A workspace with no owner membership is
+  // unusable — every org-scoped query (details, members, invitations,
+  // prospects, settings…) resolves membership through organization_members.
+  // The insert error must never be swallowed, or we'd silently report an
+  // orphaned organization as a working workspace.
+  const { data: createdMembership, error: memberError } = await supabase
+    .from("organization_members")
+    .insert({
+      organization_id: org.id,
+      user_id: user.id,
+      role: "owner",
+    })
+    .select("id")
+    .single();
+
+  if (memberError || !createdMembership) {
+    // Best-effort rollback of the just-created organization so we don't leave
+    // an orphaned workspace. (Under RLS this delete needs an owner membership
+    // to exist — which just failed — so it is attempted but may no-op. Either
+    // way we must NOT report a successful organization setup.)
+    await supabase.from("organizations").delete().eq("id", org.id).select("id");
+    return null;
+  }
 
   return org;
 }
@@ -259,6 +277,7 @@ export async function getOrganizationMembers(): Promise<
       profile: {
         id: member.user_id,
         full_name: profile?.full_name ?? null,
+        // Raw storage path is kept for reference; signed URL added below.
         avatar_url: profile?.avatar_url ?? null,
         job_role: profile?.job_role ?? null,
         email: member.user_id === user.id ? (user.email ?? "—") : "—",
@@ -266,7 +285,18 @@ export async function getOrganizationMembers(): Promise<
     };
   });
 
-  return result;
+  // Avatars live in a private bucket — swap storage paths for short-lived
+  // signed URLs so every member card can actually render them. Own path is
+  // signed directly; teammates' via the existing secure RPC helper.
+  const signedUrls = await getSignedAvatarUrls(
+    result.map((m) => ({ userId: m.profile.id, avatarPath: m.profile.avatar_url })),
+    user.id
+  );
+
+  return result.map((member, i) => ({
+    ...member,
+    profile: { ...member.profile, avatar_url: signedUrls[i] ?? member.profile.avatar_url },
+  }));
 }
 
 /**

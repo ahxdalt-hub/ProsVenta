@@ -6,7 +6,7 @@ DB_CONFIG = {
     'port': 6543,
     'dbname': 'postgres',
     'user': 'postgres.fqznwnoesagaxrbyxdxx',
-    'password': 'shanusupabase',
+    'password': __import__('os').environ.get('SUPABASE_DB_PASSWORD', ''),
     'sslmode': 'require',
     'connect_timeout': 15
 }

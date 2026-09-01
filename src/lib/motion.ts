@@ -174,16 +174,17 @@ export const backdropVariants: Variants = {
 };
 
 export const modalVariants: Variants = {
-  hidden: { opacity: 0, scale: 0.97, y: 6 },
+  hidden: { opacity: 0, scale: 0.98, y: 6 },
   visible: {
     opacity: 1,
     scale: 1,
     y: 0,
-    transition: transitions.spring,
+    // Smooth ease-out only — no spring/bounce/overshoot for dialogs.
+    transition: { duration: DURATION.slow, ease: EASE_OUT },
   },
   exit: {
     opacity: 0,
-    scale: 0.97,
+    scale: 0.98,
     y: 6,
     transition: transitions.fast,
   },

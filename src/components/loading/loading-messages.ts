@@ -8,7 +8,6 @@ export const LOADING_MESSAGES: Record<string, string[]> = {
   "/dashboard/saved-lists": ["Loading your dashboard...", "Opening saved lists...", "Almost ready..."],
   "/dashboard/analytics": ["Loading your dashboard...", "Opening analytics...", "Almost ready..."],
   "/dashboard/organization": ["Loading your dashboard...", "Loading organization...", "Almost ready..."],
-  "/dashboard/organization/members": ["Loading your dashboard...", "Loading members...", "Almost ready..."],
   "/dashboard/settings": ["Loading your dashboard...", "Loading settings...", "Almost ready..."],
   "/dashboard/help": ["Loading your dashboard...", "Opening help...", "Almost ready..."],
 };

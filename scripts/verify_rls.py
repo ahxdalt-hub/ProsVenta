@@ -1,7 +1,7 @@
 import psycopg2
 import uuid
 
-DB = dict(host='aws-0-ap-southeast-1.pooler.supabase.com', port=6543, dbname='postgres', user='postgres.fqznwnoesagaxrbyxdxx', password='shanusupabase', sslmode='require', connect_timeout=15)
+DB = dict(host='aws-0-ap-southeast-1.pooler.supabase.com', port=6543, dbname='postgres', user='postgres.fqznwnoesagaxrbyxdxx', password=__import__('os').environ.get('SUPABASE_DB_PASSWORD', ''), sslmode='require', connect_timeout=15)
 
 TEST_USER = 'ade581c5-af40-48ac-af5b-5dd2b5c94fb3'
 

@@ -6,6 +6,7 @@ import { ProsventaLogo } from "./sidebar-nav";
 import { DashboardIcon } from "../navigation/icons";
 import { ProfileMenu } from "./ProfileMenu";
 import { NotificationPopover } from "./NotificationPopover";
+import { CreditBalanceHeader } from "../credits/CreditBalanceHeader";
 import { transitions } from "@/lib/motion";
 
 interface TopbarProps {
@@ -72,6 +73,9 @@ export function Topbar({ workspaceName, userEmail, userName, avatarUrl, jobRole,
           <DashboardIcon name="search" size={17} />
         </button>
 
+        {/* Credit balance (desktop only; subtle) */}
+        <CreditBalanceHeader />
+
         <NotificationPopover />
 
         <ProfileMenu
@@ -137,6 +141,9 @@ export function Topbar({ workspaceName, userEmail, userName, avatarUrl, jobRole,
       >
         <DashboardIcon name="search" size={17} />
       </button>
+
+      {/* Credit balance (desktop only; subtle) */}
+      <CreditBalanceHeader />
 
       {/* Notifications popover */}
       <NotificationPopover />

@@ -17,6 +17,7 @@ import type {
  * Sortable fields for the prospect table.
  */
 export type ProspectSortField =
+  | "name"
   | "company_name"
   | "industry"
   | "location"
@@ -28,6 +29,7 @@ export type ProspectSortField =
   | "updated_at"
   | "lead_score"
   | "ai_fit_score"
+  | "icp_score"
   | "revenue"
   | "employee_count";
 
@@ -319,65 +321,3 @@ function asQuickFilter(value: string | null): QuickFilterPreset | undefined {
   return undefined;
 }
 
-/**
- * Default view configurations for the saved views bar.
- * Future-ready: these can become seeded rows in the database.
- */
-export interface DefaultView {
-  id: string;
-  name: string;
-  icon: string;
-  color: string;
-  description: string;
-  filters?: Partial<ProspectFilters>;
-}
-
-export const DEFAULT_VIEWS: DefaultView[] = [
-  {
-    id: "all",
-    name: "All Prospects",
-    icon: "layers",
-    color: "slate",
-    description: "Every prospect in your workspace",
-  },
-  {
-    id: "my",
-    name: "My Prospects",
-    icon: "user",
-    color: "blue",
-    description: "Prospects assigned to you",
-    filters: { owner: "__me__" },
-  },
-  {
-    id: "high-intent",
-    name: "High Intent",
-    icon: "zap",
-    color: "amber",
-    description: "Prospects with strong buying signals",
-    filters: { buying_intent: "high" },
-  },
-  {
-    id: "qualified",
-    name: "Qualified",
-    icon: "check",
-    color: "emerald",
-    description: "Prospects that are sales-qualified",
-    filters: { status: "qualified" },
-  },
-  {
-    id: "recently-added",
-    name: "Recently Added",
-    icon: "clock",
-    color: "violet",
-    description: "Newest prospects in your workspace",
-    filters: { quick_filter: "last_7_days" },
-  },
-  {
-    id: "favorites",
-    name: "Favorites",
-    icon: "star",
-    color: "amber",
-    description: "Your starred prospects",
-    filters: { favorites_only: true },
-  },
-];

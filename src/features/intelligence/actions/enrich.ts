@@ -5,8 +5,9 @@
 
 "use server";
 
-import { enrichProspectForProspect, getProspectIntelligence } from "../service";
+import { getProspectIntelligence } from "../service";
 import { enrichCompanyForProspect as enrichCompanyForProspectEnhanced } from "../company-enrichment/service";
+import { enrichPersonForProspect } from "../person-enrichment/service";
 import type { ProspectEnrichmentOperationResult, ProspectIntelligence } from "../types";
 import type { CompanyEnrichmentOperationResult } from "../company-enrichment/types";
 
@@ -18,11 +19,17 @@ export async function enrichProspectCompany(
   return enrichCompanyForProspectEnhanced(prospectId, domain, options);
 }
 
+/**
+ * Stage 6 - Phase 3: person enrichment is now served by the dedicated
+ * person-enrichment service (identity resolution, capability gating,
+ * freshness/duplicate prevention, provenance, decision-maker relevance).
+ * The action signature stays compatible with the existing workspace UI.
+ */
 export async function enrichProspectContact(
   prospectId: string,
   options?: { refresh?: boolean }
 ): Promise<ProspectEnrichmentOperationResult> {
-  return enrichProspectForProspect(prospectId, options);
+  return enrichPersonForProspect(prospectId, options);
 }
 
 export async function getProspectIntelligenceAction(

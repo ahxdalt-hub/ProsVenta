@@ -56,7 +56,7 @@ export default async function NotificationsPage() {
                 </div>
                 <p className="text-sm font-medium text-slate-900">No notifications yet</p>
                 <p className="mt-1 text-xs text-slate-400">
-                  You'll be notified when you're mentioned, assigned, or when team members take action.
+                  You&apos;ll be notified when you&apos;re mentioned, assigned, or when team members take action.
                 </p>
               </div>
             ) : (

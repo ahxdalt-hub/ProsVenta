@@ -10,6 +10,7 @@
 export type IntelligenceErrorCode =
   | "PROVIDER_UNAVAILABLE"
   | "PROVIDER_NOT_CONFIGURED"
+  | "PROVIDER_UNSUPPORTED"
   | "INVALID_DOMAIN"
   | "PROVIDER_TIMEOUT"
   | "RATE_LIMITED"
@@ -25,6 +26,7 @@ export type IntelligenceErrorCode =
 export const INTELLIGENCE_ERROR_MESSAGES: Record<IntelligenceErrorCode, string> = {
   PROVIDER_UNAVAILABLE: "The intelligence provider is currently unavailable. Please try again later.",
   PROVIDER_NOT_CONFIGURED: "No intelligence provider is configured yet. Please contact your administrator to enable company enrichment.",
+  PROVIDER_UNSUPPORTED: "The configured provider does not support this operation.",
   INVALID_DOMAIN: "The provided company domain is invalid.",
   PROVIDER_TIMEOUT: "The intelligence provider took too long to respond. Please try again.",
   RATE_LIMITED: "You've reached the rate limit for this operation. Please try again shortly.",

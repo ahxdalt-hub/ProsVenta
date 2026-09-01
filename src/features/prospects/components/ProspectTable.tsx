@@ -1,32 +1,58 @@
 "use client";
 
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils";
+import { AnchoredPopover } from "@/components/ui/AnchoredPopover";
 import type { Prospect } from "@/types/database";
+import type { ProspectWithScore } from "@/features/prospects/types/prospect";
 import type { ProspectSortField, SortOrder } from "@/features/prospects/types/query";
-import { StatusBadge, PriorityBadge, TagBadge } from "./ProspectBadges";
+import { StatusBadge, PriorityBadge, TagBadge, IcpScoreBadge, RecommendationIndicator } from "./ProspectBadges";
 import { toggleProspectFavoriteAction } from "@/features/prospects/actions/saved-views";
 
-interface ProspectTableProps {
-  prospects: Prospect[];
-  onRowClick: (prospectId: string) => void;
-  currentSort?: ProspectSortField;
-  currentOrder?: SortOrder;
-  onSort: (field: ProspectSortField) => void;
-  onToggleFavorite?: (prospectId: string, isFavorite: boolean) => void;
+interface ProspectSelection {
+  selectedIds: ReadonlySet<string>;
+  onToggle: (id: string) => void;
+  onToggleAll: () => void;
+  allSelected: boolean;
+  someSelected: boolean;
 }
 
-const columns: { key: ProspectSortField; label: string; sortable: boolean }[] = [
-  { key: "company_name", label: "Company", sortable: true },
-  { key: "industry", label: "Industry", sortable: true },
-  { key: "location", label: "Location", sortable: true },
-  { key: "website", label: "Website", sortable: true },
-  { key: "status", label: "Status", sortable: true },
-  { key: "priority", label: "Priority", sortable: true },
-  { key: "source", label: "Source", sortable: true },
-  { key: "created_at", label: "Created", sortable: true },
+interface ProspectTableProps {
+  prospects: ProspectWithScore[];
+  onRowClick: (prospectId: string) => void;
+  /**
+   * Optional column sorting. The Prospects page no longer uses it (the broken
+   * search/filter/sort implementation was removed), but the Saved Lists
+   * detail view still relies on client-side sorting over its loaded rows.
+   */
+  currentSort?: ProspectSortField;
+  currentOrder?: SortOrder;
+  onSort?: (field: ProspectSortField) => void;
+  onToggleFavorite?: (prospectId: string, isFavorite: boolean) => void;
+  /** Automatic intelligence job states keyed by prospect id (Stage 5 Task 4). */
+  scoreStates?: Record<string, "pending" | "processing" | "failed">;
+  onRetryIntelligence?: (prospectId: string) => void;
+  /** Row selection state (bulk actions). Optional for backwards safety. */
+  selection?: ProspectSelection;
+  /** Opens the existing Intelligence action window for this prospect. */
+  onEnrich?: (prospectId: string) => void;
+  onResearch?: (prospectId: string) => void;
+  /** Adds a single prospect to a list via the Save-to-List dialog. */
+  onSaveToList?: (prospectId: string) => void;
+}
+
+const columns: { key: ProspectSortField; label: string }[] = [
+  { key: "company_name", label: "Company" },
+  { key: "industry", label: "Industry" },
+  { key: "location", label: "Location" },
+  { key: "website", label: "Website" },
+  { key: "status", label: "Status" },
+  { key: "icp_score", label: "ICP Score" },
+  { key: "priority", label: "Priority" },
+  { key: "source", label: "Source" },
+  { key: "created_at", label: "Created" },
 ];
 
 function getInitials(name: string): string {
@@ -57,6 +83,8 @@ function getLocation(prospect: Prospect): string {
   return prospect.location ?? "—";
 }
 
+// Optional sort indicator — only rendered when the parent provides onSort
+// (Saved Lists detail view). The Prospects page renders plain headers.
 function SortIcon({ active, order }: { active: boolean; order?: SortOrder }) {
   if (!active) {
     return (
@@ -82,23 +110,99 @@ function SortIcon({ active, order }: { active: boolean; order?: SortOrder }) {
   );
 }
 
+// Shared checkbox renderer — one accessible style for header/rows/cards.
+function SelectCheckbox({
+  checked,
+  indeterminate,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  indeterminate?: boolean;
+  onChange: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={indeterminate ? "mixed" : checked}
+      aria-label={label}
+      onClick={(e) => {
+        e.stopPropagation();
+        onChange();
+      }}
+      onKeyDown={(e) => e.stopPropagation()}
+      className={cn(
+        "flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+        checked || indeterminate
+          ? "border-navy-900 bg-navy-900 text-white"
+          : "border-slate-300 bg-white hover:border-slate-400"
+      )}
+    >
+      {checked ? (
+        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      ) : indeterminate ? (
+        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+      ) : null}
+    </button>
+  );
+}
+
 // Memoized row component for performance
 const ProspectRow = memo(function ProspectRow({
   prospect,
   index,
   onRowClick,
   onToggleFavorite,
+  scoreState,
+  onRetryIntelligence,
+  selection,
+  onEnrich,
+  onResearch,
+  onSaveToList,
 }: {
-  prospect: Prospect;
+  prospect: ProspectWithScore;
   index: number;
   onRowClick: (id: string) => void;
   onToggleFavorite?: (id: string, isFavorite: boolean) => void;
+  scoreState?: "pending" | "processing" | "failed" | null;
+  onRetryIntelligence?: (prospectId: string) => void;
+  selection?: ProspectSelection;
+  onEnrich?: (prospectId: string) => void;
+  onResearch?: (prospectId: string) => void;
+  onSaveToList?: (prospectId: string) => void;
 }) {
   const companyName = prospect.company_name || prospect.name || "Unknown";
   const [isHovered, setIsHovered] = useState(false);
   const [isFavorite, setIsFavorite] = useState(prospect.is_favorite);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuAnchorRef = useRef<HTMLDivElement>(null);
+  const isSelected = selection?.selectedIds.has(prospect.id) ?? false;
 
-  const handleClick = useCallback(() => onRowClick(prospect.id), [prospect.id, onRowClick]);
+  const handleToggleSelect = useCallback(() => {
+    selection?.onToggle(prospect.id);
+  }, [selection, prospect.id]);
+
+  const menuItems = [
+    { label: "View details", action: () => onRowClick(prospect.id) },
+    onEnrich ? { label: "Enrich", action: () => onEnrich(prospect.id) } : null,
+    onResearch ? { label: "Research", action: () => onResearch(prospect.id) } : null,
+    onSaveToList ? { label: "Save to list", action: () => onSaveToList(prospect.id) } : null,
+  ].filter((item): item is { label: string; action: () => void } => item !== null);
+
+  const devLabel = `${prospect.company_name ?? prospect.name ?? "Unknown"}`;
+  // DEV-ONLY: trace the exact id passed to onRowClick (Phase 3 diagnostics).
+  const handleClick = useCallback(() => {
+    if (process.env.NODE_ENV === "development") {
+      console.log("[PROSPECT-ROW] clicked prospect id:", JSON.stringify(prospect.id), "company:", devLabel);
+    }
+    onRowClick(prospect.id);
+  }, [prospect.id, onRowClick, devLabel]);
 
   const handleToggleFavorite = useCallback(
     (e: React.MouseEvent) => {
@@ -132,8 +236,22 @@ const ProspectRow = memo(function ProspectRow({
       tabIndex={0}
       role="button"
       aria-label={`View ${companyName} details`}
-      className="group cursor-pointer transition-colors duration-150 hover:bg-blue-50/40 focus-visible:bg-blue-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset"
+      className={cn(
+        "group cursor-pointer transition-colors duration-150 hover:bg-blue-50/40 focus-visible:bg-blue-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset",
+        isSelected && "bg-blue-50/60"
+      )}
     >
+      {/* Selection */}
+      {selection && (
+        <td className="w-10 px-3 py-4">
+          <SelectCheckbox
+            checked={isSelected}
+            onChange={handleToggleSelect}
+            label={`Select ${companyName}`}
+          />
+        </td>
+      )}
+
       {/* Favorite star */}
       <td className="px-3 py-4 w-10">
         <button
@@ -222,6 +340,25 @@ const ProspectRow = memo(function ProspectRow({
         <StatusBadge status={prospect.status} />
       </td>
 
+      {/* ICP Score */}
+      <td className="px-5 py-4">
+        <div className="flex items-center gap-1.5">
+          <IcpScoreBadge
+            score={prospect.prospect_scores?.score ?? null}
+            category={prospect.prospect_scores?.category ?? null}
+            state={
+              scoreState === "pending" || scoreState === "processing"
+                ? "calculating"
+                : scoreState === "failed"
+                  ? "failed"
+                  : null
+            }
+            onRetry={onRetryIntelligence ? () => onRetryIntelligence(prospect.id) : undefined}
+          />
+          <RecommendationIndicator recommendations={prospect.active_recommendations} />
+        </div>
+      </td>
+
       {/* Priority */}
       <td className="px-5 py-4">
         <PriorityBadge priority={prospect.priority ?? "medium"} />
@@ -240,6 +377,48 @@ const ProspectRow = memo(function ProspectRow({
           {formatDate(prospect.created_at)}
         </span>
       </td>
+
+      {/* Row actions */}
+      <td className="w-12 px-2 py-4 text-right">
+        <div ref={menuAnchorRef} className="inline-block">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuOpen((v) => !v);
+            }}
+            aria-label={`Actions for ${companyName}`}
+            aria-expanded={menuOpen}
+            className="rounded-lg p-1.5 text-slate-400 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 opacity-0 group-hover:opacity-100 focus:opacity-100 data-[open=true]:opacity-100"
+            data-open={menuOpen}
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <circle cx="5" cy="12" r="1.8" />
+              <circle cx="12" cy="12" r="1.8" />
+              <circle cx="19" cy="12" r="1.8" />
+            </svg>
+          </button>
+          <AnchoredPopover open={menuOpen} onClose={() => setMenuOpen(false)} anchorRef={menuAnchorRef} width={180}>
+            <div role="menu" aria-label={`Actions for ${companyName}`} className="py-1">
+              {menuItems.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  role="menuitem"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenuOpen(false);
+                    item.action();
+                  }}
+                  className="flex w-full items-center px-3.5 py-2 text-left text-sm text-slate-700 transition-colors duration-150 hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none"
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </AnchoredPopover>
+        </div>
+      </td>
     </motion.tr>
   );
 });
@@ -249,12 +428,15 @@ const ProspectMobileCard = memo(function ProspectMobileCard({
   prospect,
   index,
   onRowClick,
+  selection,
 }: {
-  prospect: Prospect;
+  prospect: ProspectWithScore;
   index: number;
   onRowClick: (id: string) => void;
+  selection?: ProspectSelection;
 }) {
   const companyName = prospect.company_name || prospect.name || "Unknown";
+  const isSelected = selection?.selectedIds.has(prospect.id) ?? false;
 
   return (
     <motion.div
@@ -272,11 +454,21 @@ const ProspectMobileCard = memo(function ProspectMobileCard({
       tabIndex={0}
       role="button"
       aria-label={`View ${companyName} details`}
-      className="premium-card p-4 cursor-pointer active:scale-[0.99] transition-transform duration-100 hover:border-blue-200 hover:shadow-md"
+      className={cn(
+        "premium-card p-4 cursor-pointer active:scale-[0.99] transition-transform duration-100 hover:border-blue-200 hover:shadow-md",
+        isSelected && "border-blue-300 bg-blue-50/40"
+      )}
     >
-      {/* Top row: avatar + company + status */}
+      {/* Top row: select + avatar + company + status */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0 flex-1">
+          {selection && (
+            <SelectCheckbox
+              checked={isSelected}
+              onChange={() => selection.onToggle(prospect.id)}
+              label={`Select ${companyName}`}
+            />
+          )}
           <div className={cn("flex items-center justify-center w-10 h-10 rounded-lg text-sm font-bold shrink-0", getAvatarColor(companyName))}>
             {getInitials(companyName)}
           </div>
@@ -322,6 +514,16 @@ const ProspectMobileCard = memo(function ProspectMobileCard({
           <p className="text-slate-400">Source</p>
           <p className="text-slate-700 font-medium capitalize">{prospect.source}</p>
         </div>
+        <div>
+          <p className="text-slate-400">ICP Score</p>
+          <div className="flex items-center gap-1.5">
+            <IcpScoreBadge
+              score={prospect.prospect_scores?.score ?? null}
+              category={prospect.prospect_scores?.category ?? null}
+            />
+            <RecommendationIndicator recommendations={prospect.active_recommendations} />
+          </div>
+        </div>
       </div>
 
       {/* Website link */}
@@ -354,25 +556,47 @@ export function ProspectTable({
   currentOrder,
   onSort,
   onToggleFavorite,
+  scoreStates,
+  onRetryIntelligence,
+  selection,
+  onEnrich,
+  onResearch,
+  onSaveToList,
 }: ProspectTableProps) {
   const handleRowClick = useCallback((id: string) => onRowClick(id), [onRowClick]);
 
   return (
     <>
-      {/* Desktop Table */}
-      <div className="premium-card overflow-hidden hidden md:flex md:flex-col flex-1">
-        <div className="overflow-x-auto">
-          <table className="w-full">
+      {/* Desktop Table — the card is the fixed-height region; the inner
+          ps-scroll div is the ONLY scroll container (vertical + horizontal),
+          so rows never stretch the page and no second page scrollbar appears. */}
+      <div className="premium-card overflow-hidden hidden md:flex md:flex-col flex-1 min-h-0">
+        <div className="ps-scroll min-h-0 flex-1 overflow-x-auto overflow-y-auto">
+          {/* min-width lets narrow viewports scroll horizontally INSIDE this
+              container instead of squishing columns or overflowing the page. */}
+          <table className="w-full min-w-[1140px]">
             <thead>
-              <tr className="border-b border-slate-100 bg-slate-50/50">
-                <th className="sticky top-0 z-10 bg-slate-50/80 backdrop-blur-sm px-3 py-3.5 w-10" aria-label="Favorite" />
+              <tr>
+                {/* Sticky header: solid bg + border travel with each th so
+                    rows scroll cleanly underneath without visual overlap. */}
+                {selection && (
+                  <th className="sticky top-0 z-10 w-10 border-b border-slate-200 bg-slate-50 px-3 py-3.5">
+                    <SelectCheckbox
+                      checked={selection.allSelected}
+                      indeterminate={selection.someSelected && !selection.allSelected}
+                      onChange={selection.onToggleAll}
+                      label="Select all prospects on this page"
+                    />
+                  </th>
+                )}
                 {columns.map((col) => (
                   <th
                     key={col.key}
-                    className="sticky top-0 z-10 bg-slate-50/80 backdrop-blur-sm px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500"
+                    className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500"
                   >
-                    {col.sortable ? (
+                    {onSort ? (
                       <button
+                        type="button"
                         onClick={() => onSort(col.key)}
                         className="inline-flex items-center gap-1.5 hover:text-slate-700 transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none rounded"
                         aria-label={`Sort by ${col.label}`}
@@ -385,16 +609,23 @@ export function ProspectTable({
                     )}
                   </th>
                 ))}
+                <th className="sticky top-0 z-10 w-12 border-b border-slate-200 bg-slate-50 px-2 py-3.5" aria-label="Actions" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {prospects.map((prospect, index) => (
-                <ProspectRow
-                  key={prospect.id}
-                  prospect={prospect}
-                  index={index}
+                              <ProspectRow
+                                key={prospect.id || `fallback-${index}`}
+                                prospect={prospect}
+                                index={index}
                   onRowClick={handleRowClick}
                   onToggleFavorite={onToggleFavorite}
+                  scoreState={scoreStates?.[prospect.id] ?? null}
+                  onRetryIntelligence={onRetryIntelligence}
+                  selection={selection}
+                  onEnrich={onEnrich}
+                  onResearch={onResearch}
+                  onSaveToList={onSaveToList}
                 />
               ))}
             </tbody>
@@ -405,11 +636,12 @@ export function ProspectTable({
       {/* Mobile Cards */}
       <div className="md:hidden space-y-3">
         {prospects.map((prospect, index) => (
-          <ProspectMobileCard
-            key={prospect.id}
-            prospect={prospect}
-            index={index}
+                  <ProspectMobileCard
+                    key={prospect.id || `fallback-${index}`}
+                    prospect={prospect}
+                    index={index}
             onRowClick={handleRowClick}
+            selection={selection}
           />
         ))}
       </div>
