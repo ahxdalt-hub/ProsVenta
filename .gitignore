@@ -15,3 +15,17 @@ out/
 
 # AI tooling
 .kilo/
+
+# Build/log artifacts
+tsc-out.txt
+typecheck-output.txt
+lint-output.txt
+lint-out.txt
+build-output.txt
+build-out.txt
+build2.txt
+vitest-output.txt
+dev-server.log
+logo-preview.html
+.prospect-research-todo.md
+supabase/.temp/
