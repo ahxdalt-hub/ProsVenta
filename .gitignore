@@ -12,3 +12,6 @@ out/
 
 # TypeScript
 *.tsbuildinfo
+
+# AI tooling
+.kilo/
