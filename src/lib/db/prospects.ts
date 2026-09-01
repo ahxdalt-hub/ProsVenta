@@ -512,11 +512,22 @@ export async function getOrganizationMembers(): Promise<{ id: string; full_name:
 
   if (!user) return [];
 
-  const { data: membership } = await supabase
+  // Same error-preserving lookup as lib/db/organizations.ts — a failed or
+  // ambiguous membership query must be visible in logs, never silently "none".
+  const { data: membership, error: membershipError } = await supabase
     .from("organization_members")
     .select("organization_id")
     .eq("user_id", user.id)
-    .single();
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (membershipError) {
+    console.error(
+      "[prospects] membership lookup failed:",
+      JSON.stringify({ code: membershipError.code, message: membershipError.message })
+    );
+  }
 
   if (!membership) return [];
 

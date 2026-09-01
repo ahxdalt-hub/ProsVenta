@@ -25,6 +25,19 @@ export default async function DashboardSettingsIndexPage() {
     loadAiIntelligenceViewModel(),
   ]);
 
+  // A rejected preload previously degraded the card to a plain link with NO
+  // trace of why. Log the reason (server-side, no sensitive payload) so the
+  // failure is diagnosable while the landing page keeps working.
+  const preloadResults = { profile, workspace, icp, settingsData, ai } as const;
+  for (const [name, result] of Object.entries(preloadResults)) {
+    if (result.status === "rejected") {
+      console.error(
+        `[settings] ${name} preload failed:`,
+        result.reason instanceof Error ? result.reason.message : String(result.reason)
+      );
+    }
+  }
+
   const settings =
     settingsData.status === "fulfilled" ? settingsData.value : null;
 

@@ -540,7 +540,7 @@ export async function recoverStaleBulkEnrichmentOperations(): Promise<number> {
       .limit(5);
 
     let recovered = 0;
-    for (const raw of (candidates ?? []) as Array<{ id: string }>) {
+    for (const raw of (candidates ?? []) as Array<{ id: string; updated_at: string | null }>) {
       // Last activity = newest of the operation row itself and its most
       // recently touched job.
       const { data: lastJob } = await admin

@@ -240,5 +240,7 @@ export interface DecisionContext {
   prospectEnrichmentUpdatedAt: string | null;
   /** When Intelligence was last refreshed for this prospect */
   intelligenceUpdatedAt: string | null;
+  /** When company research was last completed for this prospect */
+  companyResearchUpdatedAt: string | null;
   signals: DecisionSignal[];
 }

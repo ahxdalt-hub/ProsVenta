@@ -368,6 +368,11 @@ function ConfirmPhase({
         <div className="h-px bg-slate-100" />
         <EstimateRow label="Estimated credits" value={`${estimate.estimatedCost} credits`} strong />
         <div className="h-px bg-slate-100" />
+        <EstimateRow
+          label="Estimated remaining credits"
+          value={`${Math.max(estimate.availableCredits - estimate.estimatedCost, 0)} credits`}
+        />
+        <div className="h-px bg-slate-100" />
         <EstimateRow label="Available credits" value={`${estimate.availableCredits} credits`} />
       </div>
       <p className="mt-3 text-xs leading-relaxed text-slate-400">

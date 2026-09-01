@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import {
   ActVisual,
   DiscoverVisual,
+  EnrichVisual,
   PrioritizeVisual,
   UnderstandVisual,
 } from "./stage-visuals";
@@ -42,24 +43,30 @@ const stageVariants = {
 const stages = [
   {
     number: "01",
-    title: "Discover",
+    title: "Find",
     description: "Find companies and prospects that fit your target.",
     visual: <DiscoverVisual />,
   },
   {
     number: "02",
+    title: "Enrich",
+    description: "Fill in firmographics, roles, and contact details.",
+    visual: <EnrichVisual />,
+  },
+  {
+    number: "03",
     title: "Understand",
     description: "Go beyond the basics with company and prospect intelligence.",
     visual: <UnderstandVisual />,
   },
   {
-    number: "03",
+    number: "04",
     title: "Prioritize",
     description: "Identify which opportunities deserve attention.",
     visual: <PrioritizeVisual />,
   },
   {
-    number: "04",
+    number: "05",
     title: "Act",
     description: "Turn the insight into a relevant next step.",
     visual: <ActVisual />,
@@ -107,7 +114,7 @@ export default function ProductJourney() {
             className="absolute left-2 right-2 top-5 hidden h-px origin-left bg-gradient-to-r from-slate-200 via-blue-200 to-slate-200 lg:block"
           />
 
-          <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-7">
+          <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-5 lg:gap-6">
             {stages.map((stage) => (
               <motion.article
                 key={stage.number}

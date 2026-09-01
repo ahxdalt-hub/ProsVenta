@@ -40,6 +40,7 @@ export default function Footer() {
 
   const exploreLinks = [
     { label: "Explore Prosventa", href: MARKETING_ROUTES.EXPLORE },
+    { label: "Pricing", href: MARKETING_ROUTES.PRICING },
     { label: "Get Started", href: MARKETING_ROUTES.GET_STARTED },
   ];
 

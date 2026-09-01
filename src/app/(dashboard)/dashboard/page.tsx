@@ -35,6 +35,7 @@ export default async function DashboardHomePage() {
       <GettingStartedSection
         profileComplete={overview.profileComplete}
         hasOrganization={overview.hasOrganization}
+        hasIcp={overview.hasIcp}
         hasProspects={overview.hasProspects}
         hasLists={overview.hasLists}
       />

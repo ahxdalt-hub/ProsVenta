@@ -36,7 +36,7 @@ export async function getSettingsData(): Promise<SettingsData> {
     return { profile: null, settings: null, email: null, emailConfirmed: false };
   }
 
-  const [{ data: profile }, { data: settings }] = await Promise.all([
+  const [profileResult, settingsResult] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, full_name, avatar_url, company_name, job_role, created_at")
@@ -48,6 +48,24 @@ export async function getSettingsData(): Promise<SettingsData> {
       .eq("user_id", user.id)
       .single(),
   ]);
+
+  // Preserve query failures in the server log — a missing profile/settings row
+  // is legal, but an RLS or schema failure must be diagnosable, not silent.
+  if (profileResult.error) {
+    console.error(
+      "[settings] profile query failed:",
+      JSON.stringify({ code: profileResult.error.code, message: profileResult.error.message })
+    );
+  }
+  if (settingsResult.error) {
+    console.error(
+      "[settings] user_settings query failed:",
+      JSON.stringify({ code: settingsResult.error.code, message: settingsResult.error.message })
+    );
+  }
+
+  const { data: profile } = profileResult;
+  const { data: settings } = settingsResult;
 
   // Real verification status from the auth provider — never assumed.
   const emailConfirmed =

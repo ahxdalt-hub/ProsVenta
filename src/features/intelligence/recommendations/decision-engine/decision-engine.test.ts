@@ -55,6 +55,7 @@ function ctx(overrides: Partial<DecisionContext> = {}): DecisionContext {
     hasProspectResearch: false,
     companyEnrichmentUpdatedAt: null,
     prospectEnrichmentUpdatedAt: null,
+    companyResearchUpdatedAt: null,
     intelligenceUpdatedAt: null,
     signals: [],
     ...overrides,
@@ -206,7 +207,9 @@ describe("priority engine", () => {
     );
     expect(dims.icpFit).toBe(92);
     expect(dims.signalImportance).toBeGreaterThan(0);
-    expect(dims.businessRelevance).toBeGreaterThanOrEqual(70);
+    // Engine methodology: relevance base 40, +20 for company research → 60.
+    // The 70+ qualityBonus band requires research PLUS enrichment.
+    expect(dims.businessRelevance).toBe(60);
   });
 });
 
@@ -269,7 +272,7 @@ describe("evidence selection", () => {
         benefitsFromAiExplanation: false,
         evidencePool: [
           { type: "signal", label: "New VP Sales", detail: "", sourceId: "sig", retrievedAt: daysAgo(2) },
-          { type: "enrichment", label: "Country: DE", detail: "", sourceId: null, retrievedAt: daysAgo(2) },
+          { type: "prospect_enrichment", label: "Country: DE", detail: "", sourceId: null, retrievedAt: daysAgo(2) },
         ],
       },
       { icpFit: 0, businessRelevance: 50, timing: 50, evidenceStrength: 50, freshness: 50, signalImportance: 0 }

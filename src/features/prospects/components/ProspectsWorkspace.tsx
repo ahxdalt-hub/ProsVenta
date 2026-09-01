@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Prospect, SavedList } from "@/types/database";
@@ -286,6 +287,18 @@ export function ProspectsWorkspace({
           countries={countries}
           sources={sources}
         />
+        {/* Phase 4: entry point to the advanced Prospect Database workspace */}
+        <Link
+          href="/dashboard/prospects/database"
+          className="btn-press inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition-all duration-150 hover:bg-slate-50 hover:shadow-md focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:outline-none"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <ellipse cx="12" cy="5" rx="9" ry="3" />
+            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+          </svg>
+          <span className="hidden sm:inline">Database</span>
+        </Link>
         <button
           type="button"
           onClick={() => setShowCreateDialog(true)}
@@ -355,7 +368,7 @@ export function ProspectsWorkspace({
           >
             <EmptyState
               title="No prospects yet"
-              description="Start building your pipeline by adding your first prospect manually, or import a list of companies."
+              description="Add prospects manually, import a list you already have, or find new leads that match your ideal customer."
               icon={
                 <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M3 21h18M3 7v14M21 7v14M3 7l9-4 9 4M9 21V11M15 21V11" />
@@ -365,6 +378,7 @@ export function ProspectsWorkspace({
                 label: "Add Prospect",
                 onClick: () => setShowCreateDialog(true),
               }}
+              secondaryAction={{ label: "Import CSV or Find Leads", href: "/dashboard/import" }}
             />
           </motion.div>
         ) : (

@@ -40,11 +40,13 @@ function Step({ number, title, description, href, done }: StepProps) {
 export function GettingStartedSection({
   profileComplete,
   hasOrganization,
+  hasIcp,
   hasProspects,
   hasLists,
 }: {
   profileComplete: boolean;
   hasOrganization: boolean;
+  hasIcp: boolean;
   hasProspects: boolean;
   hasLists: boolean;
 }) {
@@ -54,26 +56,26 @@ export function GettingStartedSection({
       title: "Complete your profile",
       description: profileComplete ? "Your profile is complete" : "Add your details to personalize your workspace",
       href: "/dashboard/settings",
-      done: profileComplete,
+      done: profileComplete && hasOrganization,
     },
     {
       number: 2,
-      title: "Set up your workspace",
-      description: hasOrganization ? "Your workspace is ready" : "Create your organization workspace",
-      href: "/dashboard/organization",
-      done: hasOrganization,
-    },
-    {
-      number: 3,
       title: "Add prospects",
-      description: hasProspects ? "You have prospects in your workspace" : "Start building your prospect pipeline",
+      description: hasProspects ? "You have prospects in your workspace" : "Import a CSV or find new leads to get started",
       href: "/dashboard/prospects",
       done: hasProspects,
     },
     {
+      number: 3,
+      title: "Define your ideal customer",
+      description: hasIcp ? "ICP scoring is active on your prospects" : "A few basics power automatic prospect scoring",
+      href: "/dashboard/settings/icp",
+      done: hasIcp,
+    },
+    {
       number: 4,
-      title: "Organize lists",
-      description: hasLists ? "You have saved lists" : "Group prospects into targeted lists",
+      title: "Organize & activate",
+      description: hasLists ? "You have saved lists" : "Group prospects into targeted lists and run intelligence",
       href: "/dashboard/saved-lists",
       done: hasLists,
     },

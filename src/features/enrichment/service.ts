@@ -38,7 +38,6 @@ import {
   normalizeEnrichmentPayload,
 } from "./normalize";
 import type {
-  EnrichableField,
   EnrichmentRequest,
   EnrichmentResult,
   NormalizedEnrichmentResponse,
@@ -256,6 +255,11 @@ export async function getEnrichmentIdempotencyKey(params: {
     scope: session.ok ? session.organizationId : "anonymous",
   });
 }
-
-export type { EnrichableField };
+// NOTE: Do NOT re-export types from this "use server" module. Next.js sweeps
+// every module-scope export of a server module into its server-action map, so a
+// type-only re-export (e.g. `export type { EnrichableField }`) gets registered
+// as a runtime server reference even though the binding is erased at compile
+// time → `ReferenceError: EnrichableField is not defined` crashes client
+// consumers of this module. EnrichableField stays available through the
+// @/features/enrichment barrel (index.ts), which re-exports it from ./types.
 

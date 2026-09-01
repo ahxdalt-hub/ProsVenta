@@ -136,13 +136,23 @@ export interface EvidenceRowLike {
 
 function asFactors(value: unknown): StoredFactor[] {
   if (!Array.isArray(value)) return [];
-  return value.filter(
+  const raw = value.filter(
     (f): f is StoredFactor =>
       typeof f === "object" &&
       f !== null &&
       typeof (f as StoredFactor).id === "string" &&
       typeof (f as StoredFactor).label === "string"
   );
+  // Factors may come from model output: ids can be missing/empty and can
+  // repeat. React keys derive from `id` (IntelligencePanel FactorRow), so
+  // normalize here — never at the render site — to keep keys stable and unique.
+  const seen = new Set<string>();
+  return raw.map((f, i) => {
+    let id = f.id.trim() || `factor-${i}`;
+    while (seen.has(id)) id = `${id}-${i}`;
+    seen.add(id);
+    return id === f.id ? f : { ...f, id };
+  });
 }
 
 const DIMENSION_ORDER: IntelligenceDimension[] = [

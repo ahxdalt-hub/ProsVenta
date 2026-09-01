@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Building2 } from "lucide-react";
+import { ArrowRight, Building2, User } from "lucide-react";
 
 function StageLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -45,7 +45,50 @@ export function DiscoverVisual() {
 }
 
 /**
- * Stage 02 — Understand.
+ * Stage 02 — Enrich.
+ * Field-level enrichment filling in around a prospect record.
+ */
+export function EnrichVisual() {
+  const fields = [
+    { label: "Industry", filled: true },
+    { label: "Company size", filled: true },
+    { label: "Role", filled: false },
+  ];
+  return (
+    <div className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-3 transition-colors duration-200 group-hover:border-slate-300">
+      <StageLabel>Enrichment</StageLabel>
+      <div className="mt-2.5 flex flex-1 flex-col justify-center gap-1.5">
+        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/70 px-2 py-[7px] transition-colors duration-200 group-hover:border-blue-100 group-hover:bg-blue-50/40">
+          <Building2 className="h-3.5 w-3.5 shrink-0 text-slate-400" strokeWidth={2} />
+          <div className="h-1.5 flex-1 rounded-full bg-slate-200 transition-colors duration-200 group-hover:bg-slate-300" />
+        </div>
+        {fields.map((field) => (
+          <div
+            key={field.label}
+            className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/40 px-2 py-[7px] transition-colors duration-200 group-hover:border-slate-200"
+          >
+            <span className="text-[11px] text-slate-500">{field.label}</span>
+            <span
+              className={`h-1.5 w-10 rounded-full transition-colors duration-200 ${
+                field.filled
+                  ? "bg-blue-400 group-hover:bg-blue-500"
+                  : "bg-slate-200"
+              }`}
+            />
+          </div>
+        ))}
+        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/70 px-2 py-[7px] transition-colors duration-200 group-hover:border-blue-100 group-hover:bg-blue-50/40">
+          <User className="h-3.5 w-3.5 shrink-0 text-slate-400" strokeWidth={2} />
+          <div className="h-1.5 w-14 rounded-full bg-slate-200 transition-colors duration-200 group-hover:bg-slate-300" />
+          <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Stage 03 — Understand.
  * A compact company intelligence representation.
  */
 export function UnderstandVisual() {

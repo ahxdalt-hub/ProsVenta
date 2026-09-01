@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useRef, useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils";
@@ -41,6 +41,11 @@ interface ProspectTableProps {
   onResearch?: (prospectId: string) => void;
   /** Adds a single prospect to a list via the Save-to-List dialog. */
   onSaveToList?: (prospectId: string) => void;
+  /**
+   * Optional column configuration (Prospect Database workspace). When omitted
+   * every standard column renders — existing pages are unaffected.
+   */
+  visibleColumns?: ReadonlySet<ProspectSortField>;
 }
 
 const columns: { key: ProspectSortField; label: string }[] = [
@@ -54,6 +59,11 @@ const columns: { key: ProspectSortField; label: string }[] = [
   { key: "source", label: "Source" },
   { key: "created_at", label: "Created" },
 ];
+
+/** Every standard column key — the default when no configuration is given. */
+export const ALL_PROSPECT_TABLE_COLUMNS: ReadonlySet<ProspectSortField> = new Set(
+  columns.map((c) => c.key)
+);
 
 function getInitials(name: string): string {
   const words = name.trim().split(/\s+/);
@@ -165,6 +175,7 @@ const ProspectRow = memo(function ProspectRow({
   onEnrich,
   onResearch,
   onSaveToList,
+  visibleColumns,
 }: {
   prospect: ProspectWithScore;
   index: number;
@@ -176,6 +187,7 @@ const ProspectRow = memo(function ProspectRow({
   onEnrich?: (prospectId: string) => void;
   onResearch?: (prospectId: string) => void;
   onSaveToList?: (prospectId: string) => void;
+  visibleColumns?: ReadonlySet<ProspectSortField>;
 }) {
   const companyName = prospect.company_name || prospect.name || "Unknown";
   const [isHovered, setIsHovered] = useState(false);
@@ -196,6 +208,12 @@ const ProspectRow = memo(function ProspectRow({
   ].filter((item): item is { label: string; action: () => void } => item !== null);
 
   const devLabel = `${prospect.company_name ?? prospect.name ?? "Unknown"}`;
+  // Column visibility (Prospect Database workspace). Company is always shown;
+  // every other standard column can be hidden via the configuration.
+  const show = useCallback(
+    (key: ProspectSortField) => !visibleColumns || visibleColumns.has(key),
+    [visibleColumns]
+  );
   // DEV-ONLY: trace the exact id passed to onRowClick (Phase 3 diagnostics).
   const handleClick = useCallback(() => {
     if (process.env.NODE_ENV === "development") {
@@ -298,20 +316,25 @@ const ProspectRow = memo(function ProspectRow({
       </td>
 
       {/* Industry */}
+      {show("industry") && (
       <td className="px-5 py-4">
         <span className="text-sm text-slate-600">
           {prospect.industry ?? "—"}
         </span>
       </td>
+      )}
 
       {/* Location */}
+      {show("location") && (
       <td className="px-5 py-4">
         <span className="text-sm text-slate-600">
           {getLocation(prospect)}
         </span>
       </td>
+      )}
 
       {/* Website */}
+      {show("website") && (
       <td className="px-5 py-4">
         {prospect.website ? (
           <a
@@ -334,13 +357,17 @@ const ProspectRow = memo(function ProspectRow({
           <span className="text-sm text-slate-400">—</span>
         )}
       </td>
+      )}
 
       {/* Status */}
+      {show("status") && (
       <td className="px-5 py-4">
         <StatusBadge status={prospect.status} />
       </td>
+      )}
 
       {/* ICP Score */}
+      {show("icp_score") && (
       <td className="px-5 py-4">
         <div className="flex items-center gap-1.5">
           <IcpScoreBadge
@@ -358,25 +385,32 @@ const ProspectRow = memo(function ProspectRow({
           <RecommendationIndicator recommendations={prospect.active_recommendations} />
         </div>
       </td>
+      )}
 
       {/* Priority */}
+      {show("priority") && (
       <td className="px-5 py-4">
         <PriorityBadge priority={prospect.priority ?? "medium"} />
       </td>
+      )}
 
       {/* Source */}
+      {show("source") && (
       <td className="px-5 py-4">
         <span className="text-sm text-slate-500 capitalize">
           {prospect.source}
         </span>
       </td>
+      )}
 
       {/* Created */}
+      {show("created_at") && (
       <td className="px-5 py-4">
         <span className="text-sm text-slate-500">
           {formatDate(prospect.created_at)}
         </span>
       </td>
+      )}
 
       {/* Row actions */}
       <td className="w-12 px-2 py-4 text-right">
@@ -484,10 +518,12 @@ const ProspectMobileCard = memo(function ProspectMobileCard({
         <StatusBadge status={prospect.status} />
       </div>
 
-      {/* Tags */}
+      {/* Tags — dedupe + drop empty entries; tags can contain duplicates or
+          empty strings (imports / legacy rows) which produced duplicate React
+          keys (`key={tag}`). */}
       {prospect.tags && prospect.tags.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {prospect.tags.slice(0, 3).map((tag) => (
+          {Array.from(new Set(prospect.tags.filter((t) => t.trim() !== ""))).slice(0, 3).map((tag) => (
             <TagBadge key={tag} tag={tag} />
           ))}
           {prospect.tags.length > 3 && (
@@ -562,8 +598,14 @@ export function ProspectTable({
   onEnrich,
   onResearch,
   onSaveToList,
+  visibleColumns,
 }: ProspectTableProps) {
   const handleRowClick = useCallback((id: string) => onRowClick(id), [onRowClick]);
+  // Configurable columns (Prospect Database workspace). Undefined = all shown.
+  const activeColumns = useMemo(
+    () => (visibleColumns ? columns.filter((c) => visibleColumns.has(c.key)) : columns),
+    [visibleColumns]
+  );
 
   return (
     <>
@@ -589,7 +631,7 @@ export function ProspectTable({
                     />
                   </th>
                 )}
-                {columns.map((col) => (
+                {activeColumns.map((col) => (
                   <th
                     key={col.key}
                     className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500"
@@ -626,6 +668,7 @@ export function ProspectTable({
                   onEnrich={onEnrich}
                   onResearch={onResearch}
                   onSaveToList={onSaveToList}
+                  visibleColumns={visibleColumns}
                 />
               ))}
             </tbody>

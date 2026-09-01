@@ -180,6 +180,7 @@ export async function buildDecisionContext(
     hasProspectResearch,
     companyEnrichmentUpdatedAt,
     prospectEnrichmentUpdatedAt,
+    companyResearchUpdatedAt,
     intelligenceUpdatedAt,
     signals: signalRecords.map((s) => ({
       id: s.id,

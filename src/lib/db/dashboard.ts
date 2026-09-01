@@ -12,6 +12,8 @@ export interface DashboardOverviewData {
   hasOrganization: boolean;
   hasProspects: boolean;
   hasLists: boolean;
+  /** True when the workspace has an ICP configuration (powers scoring). */
+  hasIcp: boolean;
 }
 
 /**
@@ -33,6 +35,7 @@ export async function getDashboardOverview(): Promise<DashboardOverviewData> {
       hasOrganization: false,
       hasProspects: false,
       hasLists: false,
+      hasIcp: false,
     };
   }
 
@@ -71,9 +74,16 @@ export async function getDashboardOverview(): Promise<DashboardOverviewData> {
   }
 
   // Real counts
-  const [prospectCount, savedListCount] = await Promise.all([
+  const [prospectCount, savedListCount, icpConfig] = await Promise.all([
     getProspectCount(),
     getSavedListCount(),
+    membership?.organization_id
+      ? supabase
+          .from("icp_configurations")
+          .select("id")
+          .eq("organization_id", membership.organization_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null } as { data: unknown }),
   ]);
 
   return {
@@ -84,5 +94,6 @@ export async function getDashboardOverview(): Promise<DashboardOverviewData> {
     hasOrganization,
     hasProspects: prospectCount > 0,
     hasLists: savedListCount > 0,
+    hasIcp: Boolean((icpConfig as { data: { id: string } | null }).data?.id),
   };
 }

@@ -56,14 +56,17 @@ describe("freshness", () => {
 
 describe("importance methodology (explainable, no arbitrary scores)", () => {
   it("rates a recent high-confidence funding event higher than an old low-confidence one", () => {
+    // Dates are relative to Date.now() so the test does not silently drift
+    // out of the "recent" freshness window as wall-clock time advances.
+    const DAY = 24 * 60 * 60 * 1000;
     const recent = computeExternalImportance({
       signalType: "funding_event",
-      publishedAt: "2026-08-23T00:00:00Z",
+      publishedAt: new Date(Date.now() - 1 * DAY).toISOString(),
       confidence: "high",
     });
     const old = computeExternalImportance({
       signalType: "funding_event",
-      publishedAt: "2026-03-01T00:00:00Z",
+      publishedAt: new Date(Date.now() - 200 * DAY).toISOString(),
       confidence: "low",
     });
     expect(recent.score).toBeGreaterThan(old.score);

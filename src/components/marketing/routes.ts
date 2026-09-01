@@ -8,4 +8,6 @@ export const MARKETING_ROUTES = {
   LOGIN: "/login",
   /** Explore destination — dedicated Phase 6 route for the system overview. */
   EXPLORE: "/explore",
+  /** Pricing page — plans, credits, FAQ. */
+  PRICING: "/pricing",
 } as const;

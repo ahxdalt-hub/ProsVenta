@@ -158,7 +158,7 @@ export function detectPrioritizeCandidate(
   if (strongRelevance) {
     reasons.push("company research supports business relevance");
     pool.push({
-      type: "research",
+      type: "company_research",
       label: "Company research available",
       detail: "Existing research corroborates business relevance.",
       sourceId: null,
@@ -168,7 +168,7 @@ export function detectPrioritizeCandidate(
   if (decisionMaker) {
     reasons.push("prospect role enriched");
     pool.push({
-      type: "enrichment",
+      type: "prospect_enrichment",
       label: "Decision-maker profile available",
       detail: "Prospect role and seniority have been enriched.",
       sourceId: null,

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+﻿import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
@@ -13,6 +13,8 @@ interface EmptyStateProps {
   description?: string;
   icon?: ReactNode;
   action?: EmptyStateAction;
+  /** Optional quieter secondary action (e.g. an alternate way to get started). */
+  secondaryAction?: EmptyStateAction;
   className?: string;
 }
 
@@ -25,6 +27,7 @@ export function EmptyState({
   description,
   icon,
   action,
+  secondaryAction,
   className,
 }: EmptyStateProps) {
   const content = (
@@ -53,6 +56,23 @@ export function EmptyState({
             className="mt-5 inline-flex items-center justify-center rounded-lg bg-navy-900 px-4 py-2 text-sm font-medium text-white hover:bg-navy-800 transition-colors duration-150"
           >
             {action.label}
+          </button>
+        ) : null)}
+      {secondaryAction &&
+        (secondaryAction.href ? (
+          <Link
+            href={secondaryAction.href}
+            className="mt-2 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors duration-150"
+          >
+            {secondaryAction.label}
+          </Link>
+        ) : secondaryAction.onClick ? (
+          <button
+            type="button"
+            onClick={secondaryAction.onClick}
+            className="mt-2 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors duration-150"
+          >
+            {secondaryAction.label}
           </button>
         ) : null)}
     </div>

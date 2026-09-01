@@ -29,6 +29,41 @@ export interface OrganizationDetails {
 }
 
 // ============================================================================
+// Membership lookup helper
+// ============================================================================
+// Every org-scoped query resolves the workspace through organization_members.
+// `.single()` collapses "no rows", "multiple rows" AND "query failed" into
+// data=null, which silently produced broken workspaces for affected accounts.
+// This helper preserves the actual error (code + message only — no tokens or
+// PII) in the server log and picks the OLDEST membership deterministically
+// when a user somehow has more than one (legacy data from earlier runs).
+// ============================================================================
+
+async function getPrimaryMembership(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+): Promise<OrganizationMember | null> {
+  const { data, error } = await supabase
+    .from("organization_members")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    // Surface the real reason (RLS denial, missing table, etc.) instead of
+    // reporting a silent "no workspace".
+    console.error(
+      "[organizations] membership lookup failed:",
+      JSON.stringify({ code: error.code, message: error.message })
+    );
+  }
+
+  return (data as OrganizationMember) ?? null;
+}
+
+// ============================================================================
 // Organization Queries
 // ============================================================================
 
@@ -45,19 +80,22 @@ export async function ensureOrganization(): Promise<Organization | null> {
 
   if (!user) return null;
 
-  // Check for existing membership
-  const { data: membership } = await supabase
-    .from("organization_members")
-    .select("organization_id")
-    .eq("user_id", user.id)
-    .single();
+  // Check for existing membership (error-preserving; see getPrimaryMembership)
+  const membership = await getPrimaryMembership(supabase, user.id);
 
   if (membership) {
-    const { data: org } = await supabase
+    const { data: org, error: orgError } = await supabase
       .from("organizations")
       .select("*")
       .eq("id", membership.organization_id)
       .single();
+    if (orgError || !org) {
+      console.error(
+        "[organizations] organization lookup failed:",
+        JSON.stringify({ code: orgError?.code ?? null, message: orgError?.message ?? null, organizationId: membership.organization_id })
+      );
+      return null;
+    }
     return org;
   }
 
@@ -80,7 +118,13 @@ export async function ensureOrganization(): Promise<Organization | null> {
     .select()
     .single();
 
-  if (orgError || !org) return null;
+  if (orgError || !org) {
+    console.error(
+      "[organizations] organization creation failed:",
+      JSON.stringify({ code: orgError?.code ?? null, message: orgError?.message ?? null })
+    );
+    return null;
+  }
 
   // Create the owner membership. A workspace with no owner membership is
   // unusable — every org-scoped query (details, members, invitations,
@@ -129,12 +173,8 @@ export async function getOrganizationDetails(): Promise<OrganizationDetails> {
     };
   }
 
-  // Get the user's membership
-  const { data: membership } = await supabase
-    .from("organization_members")
-    .select("*")
-    .eq("user_id", user.id)
-    .single();
+  // Get the user's membership (error-preserving)
+  const membership = await getPrimaryMembership(supabase, user.id);
 
   if (!membership) {
     return {
@@ -182,11 +222,7 @@ export async function getOrganizationId(): Promise<string | null> {
 
   if (!user) return null;
 
-  const { data: membership } = await supabase
-    .from("organization_members")
-    .select("organization_id")
-    .eq("user_id", user.id)
-    .single();
+  const membership = await getPrimaryMembership(supabase, user.id);
 
   return membership?.organization_id ?? null;
 }
@@ -343,11 +379,7 @@ export async function getMemberCount(): Promise<number> {
 
   if (!user) return 0;
 
-  const { data: membership } = await supabase
-    .from("organization_members")
-    .select("organization_id")
-    .eq("user_id", user.id)
-    .single();
+  const membership = await getPrimaryMembership(supabase, user.id);
 
   if (!membership) return 0;
 
