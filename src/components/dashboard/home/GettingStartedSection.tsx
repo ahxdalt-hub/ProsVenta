@@ -55,7 +55,7 @@ export function GettingStartedSection({
       number: 1,
       title: "Complete your profile",
       description: profileComplete ? "Your profile is complete" : "Add your details to personalize your workspace",
-      href: "/dashboard/settings",
+      href: "/dashboard/settings?section=profile",
       done: profileComplete && hasOrganization,
     },
     {
@@ -69,7 +69,7 @@ export function GettingStartedSection({
       number: 3,
       title: "Define your ideal customer",
       description: hasIcp ? "ICP scoring is active on your prospects" : "A few basics power automatic prospect scoring",
-      href: "/dashboard/settings/icp",
+      href: "/dashboard/settings?section=icp",
       done: hasIcp,
     },
     {

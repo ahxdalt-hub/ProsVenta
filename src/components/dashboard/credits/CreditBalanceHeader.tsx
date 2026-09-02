@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+
 import { AnimatePresence } from "framer-motion";
 import { useApiResource } from "@/lib/hooks/useApiResource";
 import type { CreditSummaryDto } from "@/features/credits/api-types";
@@ -19,16 +19,12 @@ import { CreditsPopover } from "./CreditsPopover";
 // ============================================================================
 // Subtle topbar widget: "Prosventa Credits / 5,240". Never dominates the UI.
 // Click opens a compact quick-overview POPOVER anchored to this button instead
-// of navigating away. The single /api/credits/summary fetch here feeds both the
-// button and the popover — no extra requests. On load FAILURE it never shows
+// of navigating away. The single /api/credits/summary fetch here feeds the
+// button. No extra requests.. On load FAILURE it never shows
 // 0 — it shows a neutral "unavailable" state with retry (critical distinction).
-// The popover's "View billing details" CTA routes to the canonical NEW Settings
-// landing page (/dashboard/settings?focus=billing), which smooth-scrolls to and
-// highlights the Billing section.
 // ============================================================================
 
 export function CreditBalanceHeader() {
-  const router = useRouter();
   const [popoverOpen, setPopoverOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -63,10 +59,6 @@ export function CreditBalanceHeader() {
     };
   }, [popoverOpen, closePopover]);
 
-  const handleViewBilling = () => {
-    setPopoverOpen(false);
-    router.push("/dashboard/settings?focus=billing");
-  };
 
   const balance =
     typeof data?.wallet?.balance === "number" ? data.wallet.balance : null;
@@ -150,11 +142,11 @@ export function CreditBalanceHeader() {
         {popoverOpen && (
           <CreditsPopover
             open={popoverOpen}
-            onViewBilling={handleViewBilling}
             data={data}
             loading={loading}
             error={error}
-            onRetry={() => void refresh()}
+            refresh={refresh}
+            onNavigate={() => closePopover(false)}
           />
         )}
       </AnimatePresence>

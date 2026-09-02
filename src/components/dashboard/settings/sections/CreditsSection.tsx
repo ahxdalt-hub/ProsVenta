@@ -32,6 +32,7 @@ import {
   getCreditHealth,
   type CreditHealth,
 } from "@/features/credits/ui-config";
+import { settingsHref } from "@/lib/settings/navigation";
 import { EASE_OUT } from "@/lib/motion";
 import { GetMoreCreditsCard } from "./monetization/GetMoreCreditsCard";
 import {
@@ -494,7 +495,7 @@ export function CreditsSection() {
       <p className="text-center text-[13px] text-slate-400">
         Looking for your plan or subscription?{" "}
         <Link
-          href="/dashboard/settings/plan-billing"
+          href={settingsHref("plan-billing")}
           className="font-medium text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
         >
           Manage it in Plan &amp; Billing

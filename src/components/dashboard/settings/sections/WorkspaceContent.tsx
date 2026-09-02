@@ -113,7 +113,7 @@ export function WorkspaceContent({ vm }: { vm: WorkspaceViewModel }) {
           action={
             canManage && (
               <Link
-                href="/dashboard/organization"
+                href="/dashboard/settings?section=workspace"
                 className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
               >
                 Invite teammates
@@ -130,7 +130,7 @@ export function WorkspaceContent({ vm }: { vm: WorkspaceViewModel }) {
             </p>
           </div>
           <Link
-            href="/dashboard/organization"
+            href="/dashboard/settings?section=workspace"
             className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
           >
             Manage members

@@ -55,7 +55,7 @@ export const COMMAND_LIST: readonly PaletteCommand[] = [
   {
     id: "organization",
     label: "Organization",
-    href: "/dashboard/organization",
+    href: "/dashboard/settings?section=workspace",
     section: "Workspace",
     icon: "organization",
     description: "Company workspace settings",

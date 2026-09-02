@@ -958,6 +958,22 @@ input[type="checkbox"].prosventa-checkbox:indeterminate::after {
   animation: settings-section-enter 0.25s var(--motion-ease-out) forwards;
 }
 
+/* Settings card — "2-blink" deep-link glow
+   Applied by SettingsSectionHighlighter when a button elsewhere in the app
+   jumps to a settings section (?section=...). A soft blue ring pulses twice
+   around the card's border. Reduced motion collapses the duration (see the
+   global .reduce-motion rule). */
+@keyframes settings-card-glow {
+  0%   { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+  35%  { box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.4); }
+  60%  { box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.18); }
+  100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+}
+
+.settings-card-glow {
+  animation: settings-card-glow 0.75s ease-in-out 2;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .settings-section-enter {
     animation: none;

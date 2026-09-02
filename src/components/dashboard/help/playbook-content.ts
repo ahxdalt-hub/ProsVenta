@@ -517,7 +517,7 @@ export const PLAYBOOKS: Playbook[] = [
         why: "The organization profile anchors the workspace identity that every member sees.",
         action: {
           label: "Go to Organization",
-          href: "/dashboard/organization",
+          href: "/dashboard/settings?section=workspace",
         },
       },
       {
@@ -528,7 +528,7 @@ export const PLAYBOOKS: Playbook[] = [
         why: "Prospecting compounds when it's shared: lists, notes, and statuses are visible workspace-wide, so teammates build on each other's work.",
         action: {
           label: "Go to Organization",
-          href: "/dashboard/organization",
+          href: "/dashboard/settings?section=workspace",
         },
       },
       {
@@ -547,7 +547,7 @@ export const PLAYBOOKS: Playbook[] = [
         why: "Knowing which settings are personal versus workspace-wide prevents confusion when a change affects teammates unexpectedly.",
         action: {
           label: "Go to Settings",
-          href: "/dashboard/settings",
+          href: "/dashboard/settings?section=workspace",
         },
       },
       {
@@ -559,7 +559,7 @@ export const PLAYBOOKS: Playbook[] = [
         why: "The ICP is the tuning knob for the entire scoring system — a well-set profile makes every score, priority, and recommendation more accurate.",
         action: {
           label: "Go to Settings",
-          href: "/dashboard/settings",
+          href: "/dashboard/settings?section=icp",
           hint: "Organization → Ideal Customer Profile",
         },
       },

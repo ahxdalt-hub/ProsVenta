@@ -138,6 +138,8 @@ export function SettingsNavCardWithPanel({
     <>
       <button
         type="button"
+        id={`settings-card-${item.id}`}
+        data-settings-card={item.id}
         onClick={openPanel}
         aria-haspopup="dialog"
         aria-expanded={selectedSettingsSection === item.id}

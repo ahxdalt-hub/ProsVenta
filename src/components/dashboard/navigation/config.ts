@@ -34,7 +34,7 @@ export const NAV_GROUPS: NavGroup[] = [
       // all member management. The legacy /dashboard/organization/members
       // route redirects back to /dashboard/organization.
       { label: "Automation", href: "/dashboard/automation", icon: "automation" },
-      { label: "Organization", href: "/dashboard/organization", icon: "organization" },
+      { label: "Organization", href: "/dashboard/settings?section=workspace", icon: "organization" },
     ],
   },
   {

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { cn } from "@/lib/utils";
 import {
   getImplementedNavGroups,
@@ -10,6 +11,7 @@ import { DashboardIcon } from "@/components/dashboard/navigation/icons";
 import { CreditToken } from "@/components/dashboard/credits/CreditToken";
 import { SettingsPageTransition } from "./SettingsShell";
 import { SettingsBillingFocus } from "./SettingsBillingFocus";
+import { SettingsSectionHighlighter } from "./SettingsSectionHighlighter";
 import {
   SettingsNavCardWithPanel,
   type PanelData,
@@ -69,6 +71,8 @@ function NavCard({ item, emphasized = false, compact = false }: NavCardProps) {
   return (
     <Link
       href={settingsHref(item.id)}
+      id={`settings-card-${item.id}`}
+      data-settings-card={item.id}
       className={cn(
         "group relative flex items-start text-left",
         compact ? "gap-3 p-4" : "gap-4 p-5 sm:p-6",
@@ -213,6 +217,12 @@ export function SettingsLanding({
 
       {/* Consumes ?focus=billing deep links (from the topbar Credits popover). */}
       <SettingsBillingFocus />
+
+      {/* Consumes ?section=... deep links — scrolls to the card and glows it
+          twice (wrapped in Suspense for useSearchParams safety). */}
+      <Suspense fallback={null}>
+        <SettingsSectionHighlighter />
+      </Suspense>
     </div>
   );
 }

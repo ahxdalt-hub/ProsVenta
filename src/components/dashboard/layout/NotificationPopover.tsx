@@ -47,12 +47,12 @@ function getNotificationDestination(notification: Notification): string {
     case "export_completed":
       return "/dashboard/export";
     case "member_joined":
-      return "/dashboard/team";
+      return "/dashboard/settings?section=workspace";
     case "signal_detected":
       return "/dashboard/prospects";
     case "system_alert":
     default:
-      return "/dashboard/notifications";
+      return "/dashboard/settings?section=notifications";
   }
 }
 
@@ -317,7 +317,7 @@ export function NotificationPopover() {
   // ------------------------------------------------------------------------
   const handleViewAll = useCallback(() => {
     setOpen(false);
-    router.push("/dashboard/notifications");
+    router.push("/dashboard/settings?section=notifications");
   }, [router]);
 
   const unread = notifications.filter((n) => !n.is_read).length;

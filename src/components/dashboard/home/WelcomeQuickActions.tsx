@@ -54,7 +54,7 @@ const QUICK_ACTIONS: QuickAction[] = [
   {
     title: "View Workspace",
     description: "Manage your organization",
-    href: "/dashboard/organization",
+    href: "/dashboard/settings?section=workspace",
     icon: "organization",
   },
   {

@@ -218,3 +218,14 @@ export const SETTINGS_BASE_PATH = "/dashboard/settings";
 export function settingsHref(id: SettingsSectionId): string {
   return `${SETTINGS_BASE_PATH}/${id}`;
 }
+
+/**
+ * Deep link to a settings section that lands on the Settings control-center
+ * page, scrolls to the matching card and flashes a glow around it. External
+ * buttons ("Configure ICP", "Go to Organization") use this instead of the
+ * section's standalone minimized route so the user always lands on the wide
+ * Settings hub with clear context for where they arrived.
+ */
+export function settingsDeepLink(id: SettingsSectionId): string {
+  return `${SETTINGS_BASE_PATH}?section=${id}`;
+}
