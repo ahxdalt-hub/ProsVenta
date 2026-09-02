@@ -79,6 +79,29 @@ export async function getRecentSignalsForWorkspace(
 }
 
 /**
+ * Error-aware variant for Intelligence: distinguishes a genuinely empty feed
+ * from a failed load, so the UI never shows a failure as an empty feed.
+ * RLS ensures only the user's org signals are returned.
+ */
+export async function getRecentSignalsForWorkspaceDetailed(
+  limit = 20
+): Promise<{ rows: SignalRecord[]; failed: boolean }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("signals")
+    .select("*")
+    .in("status", [...LIVE_SIGNAL_STATUSES])
+    .order("detected_at", { ascending: false })
+    .limit(limit);
+
+  return {
+    rows: (data ?? []) as SignalRecord[],
+    failed: Boolean(error),
+  };
+}
+
+
+/**
  * Checks whether a signal with the given dedupe key already exists
  * in the workspace. Used for safe deduplication.
  */

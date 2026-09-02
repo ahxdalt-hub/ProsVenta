@@ -149,7 +149,20 @@ export function IntelligenceActionWindow({
     if (!open || !request || !config) return;
     runningRef.current = false;
     setPhase("preparing");
-    setTarget(null);
+    // Phase 4: when the action is launched from a specific record, start with
+    // that target preselected (the selector still allows changing it).
+    const ctx = request.context;
+    setTarget(
+      ctx?.targetId
+        ? {
+            id: ctx.targetId,
+            name: ctx.targetName ?? "Selected prospect",
+            sub: ctx.targetSub ?? "",
+            domain: ctx.targetDomain ?? "",
+            contact: ctx.targetContact ?? null,
+          }
+        : null
+    );
     setBalance(null);
     setSignal(null);
     setErrorMessage(null);
@@ -481,7 +494,7 @@ export function IntelligenceActionWindow({
         <TargetSelector
           kind={config.kind}
           placeholder={config.searchPrompt}
-          initialTarget={null}
+          initialTarget={target}
           onSelect={setTarget}
         />
 

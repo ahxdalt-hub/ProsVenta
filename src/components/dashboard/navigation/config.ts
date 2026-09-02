@@ -23,6 +23,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Find Leads", href: "/dashboard/find-leads", icon: "search", featureId: "prospects" },
       { label: "Saved Lists", href: "/dashboard/saved-lists", icon: "lists", featureId: "saved_lists" },
       { label: "Import", href: "/dashboard/import", icon: "import", featureId: "import" },
+      { label: "Analytics", href: "/dashboard/analytics", icon: "analytics" },
     ],
   },
   {
@@ -32,6 +33,7 @@ export const NAV_GROUPS: NavGroup[] = [
       // no standalone navigation item — the in-page Members window handles
       // all member management. The legacy /dashboard/organization/members
       // route redirects back to /dashboard/organization.
+      { label: "Automation", href: "/dashboard/automation", icon: "automation" },
       { label: "Organization", href: "/dashboard/organization", icon: "organization" },
     ],
   },

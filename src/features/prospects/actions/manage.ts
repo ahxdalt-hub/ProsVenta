@@ -180,6 +180,42 @@ export async function retryIntelligenceAction(
 }
 
 /**
+ * Deletes MULTIPLE prospects in one round trip (bulk delete from the
+ * Prospects action bar). RLS ensures users can only delete prospects in
+ * their organization; individually-deleted rows are counted.
+ */
+export async function deleteProspectsAction(
+  prospectIds: string[]
+): Promise<{ error: string | null; deleted: number }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+
+  if (prospectIds.length === 0) {
+    return { error: "Nothing to delete.", deleted: 0 };
+  }
+
+  let deleted = 0;
+  let lastError: string | null = null;
+  for (const prospectId of prospectIds) {
+    const ok = await deleteProspect(prospectId);
+    if (ok) deleted += 1;
+    else lastError = "Some prospects could not be deleted.";
+  }
+
+  revalidatePath("/dashboard/prospects");
+  revalidatePath("/dashboard/prospects/database");
+
+  if (deleted === 0) {
+    return { error: lastError ?? "Could not delete prospects.", deleted: 0 };
+  }
+  return { error: lastError, deleted };
+}
+
+/**
  * Deletes a prospect.
  * RLS ensures users can only delete prospects in their organization.
  */

@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, memo, useState } from "react";
+import { useEffect, memo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { SidebarContent, ProsventaLogo } from "./sidebar-nav";
 import { DashboardIcon } from "../navigation/icons";
@@ -30,7 +30,7 @@ export const Sidebar = memo(function Sidebar({ collapsed = false, onToggleCollap
   if (reduce) {
     return (
       <aside className={cn("fixed inset-y-0 left-0 z-40 hidden lg:flex", widthClass)}>
-        <div className="dashboard-sidebar w-full overflow-hidden">
+        <div id="dashboard-sidebar" className="dashboard-sidebar w-full overflow-hidden">
           <SidebarHeader collapsed={collapsed} onToggleCollapse={onToggleCollapse} />
           <div className="min-h-0 flex-1 overflow-y-auto py-3">
             <SidebarContent pathname={pathname} collapsed={collapsed} />
@@ -51,7 +51,7 @@ export const Sidebar = memo(function Sidebar({ collapsed = false, onToggleCollap
       animate={entered ? { opacity: 1, x: 0 } : { opacity: 0, x: -8 }}
       transition={transitions.slow}
     >
-      <div className="dashboard-sidebar w-full overflow-hidden">
+      <div id="dashboard-sidebar" className="dashboard-sidebar w-full overflow-hidden">
         <SidebarHeader collapsed={collapsed} onToggleCollapse={onToggleCollapse} />
         <div className="min-h-0 flex-1 overflow-y-auto py-3">
           <SidebarContent pathname={pathname} collapsed={collapsed} />
@@ -125,12 +125,7 @@ function SidebarFooter({ collapsed, onToggleCollapse }: { collapsed: boolean; on
 
   return (
     <div className="border-t border-slate-200/70 px-5 py-4">
-      <p className="text-[11px] text-slate-400">
-        {new Date().getFullYear()} Prosventa
-        <span className="mt-0.5 block font-medium text-slate-500">
-          Production Ready
-        </span>
-      </p>
+      <p className="text-[11px] text-slate-400">{new Date().getFullYear()} Prosventa</p>
     </div>
   );
 }
@@ -144,6 +139,8 @@ interface MobileDrawerProps {
 
 export function MobileDrawer({ open, onClose }: MobileDrawerProps) {
   const pathname = usePathname();
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const previouslyFocused = useRef<HTMLElement | null>(null);
 
   // Close on route change (only when open)
   useEffect(() => {
@@ -151,7 +148,7 @@ export function MobileDrawer({ open, onClose }: MobileDrawerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  // Lock body scroll & close on Escape — only on mobile viewports
+  // Lock body scroll, close on Escape, trap focus & restore focus on close
   useEffect(() => {
     if (!open) return;
 
@@ -162,14 +159,44 @@ export function MobileDrawer({ open, onClose }: MobileDrawerProps) {
     const original = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
+    // Remember the trigger so focus can return to it on close
+    previouslyFocused.current = document.activeElement as HTMLElement | null;
+
+    // Move focus into the drawer
+    const focusableSelector =
+      'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])';
+    const firstFocusable = drawerRef.current?.querySelector<HTMLElement>(focusableSelector);
+    firstFocusable?.focus();
+
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      // Simple focus trap: keep Tab cycling inside the drawer
+      if (e.key === "Tab" && drawerRef.current) {
+        const focusable = Array.from(
+          drawerRef.current.querySelectorAll<HTMLElement>(focusableSelector)
+        ).filter((el) => el.offsetParent !== null);
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     }
     window.addEventListener("keydown", onKeyDown);
 
     return () => {
       document.body.style.overflow = original;
       window.removeEventListener("keydown", onKeyDown);
+      // Restore focus to the trigger that opened the drawer
+      previouslyFocused.current?.focus?.();
     };
   }, [open, onClose]);
 
@@ -187,6 +214,7 @@ export function MobileDrawer({ open, onClose }: MobileDrawerProps) {
 
       {/* Drawer surface */}
       <div
+        ref={drawerRef}
         role="dialog"
         aria-modal="true"
         aria-label="Dashboard navigation"
@@ -218,9 +246,6 @@ export function MobileDrawer({ open, onClose }: MobileDrawerProps) {
           <div className="border-t border-slate-200/70 px-5 py-4">
             <p className="text-[11px] text-slate-400">
               {new Date().getFullYear()} Prosventa
-              <span className="mt-0.5 block font-medium text-slate-500">
-                Production Ready
-              </span>
             </p>
           </div>
         </div>

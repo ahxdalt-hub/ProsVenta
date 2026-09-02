@@ -9,6 +9,8 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
   isSuccess?: boolean;
   children: React.ReactNode;
+  /** React 19 — refs pass through as a regular prop. */
+  ref?: React.Ref<HTMLButtonElement>;
 }
 
 const variants = {
@@ -38,11 +40,13 @@ export function Button({
   loading = false,
   isSuccess = false,
   disabled,
+  ref,
   children,
   ...props
 }: ButtonProps) {
   return (
     <button
+      ref={ref}
       className={cn(
         "btn-press inline-flex items-center justify-center gap-2 font-semibold transition-all duration-150 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none disabled:active:scale-100",
         variants[variant],

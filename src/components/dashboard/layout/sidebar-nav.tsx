@@ -30,11 +30,10 @@ function SidebarNavLink({ item, isActive, onNavigate, collapsed }: SidebarNavLin
       if (isTransitioning) return;
 
       setPressed(true);
-      // Small tactile delay to let the press animation register
-      setTimeout(() => {
-        onNavigate?.();
-        navigate(item.href);
-      }, 80);
+      // Navigate immediately — the press animation still plays, and waiting
+      // here only made the app feel artificially slow.
+      onNavigate?.();
+      navigate(item.href);
     },
     [isTransitioning, item.href, navigate, onNavigate]
   );

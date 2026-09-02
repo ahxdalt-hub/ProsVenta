@@ -769,3 +769,37 @@ export async function getProspectWithDetails(id: string): Promise<{
 
   return { prospect, notes, listIds, score: scoreResult };
 }
+// ============================================================================
+// Intelligence Priorities — Bounded Prospect Identity Lookup
+// ============================================================================
+// Lightweight identity map for a SMALL, explicit set of prospect ids (the
+// Intelligence priority list, capped at its feed limit). One query, identity
+// columns only — never a full-table prospect scan. RLS scopes every row.
+// ============================================================================
+
+export interface ProspectIdentity {
+  id: string;
+  name: string | null;
+  company_name: string | null;
+  industry: string | null;
+  country: string | null;
+  city: string | null;
+}
+
+export async function getProspectIdentityMap(
+  ids: string[]
+): Promise<Record<string, ProspectIdentity>> {
+  const map: Record<string, ProspectIdentity> = {};
+  if (ids.length === 0) return map;
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("prospects")
+    .select("id, name, company_name, industry, country, city")
+    .in("id", ids);
+
+  for (const row of (data ?? []) as ProspectIdentity[]) {
+    map[row.id] = row;
+  }
+  return map;
+}

@@ -95,6 +95,8 @@ export interface CreditPackageDto {
   displayPrice: string;
   /** Only true when objectively configured on the package (metadata.recommended). */
   recommended: boolean;
+  /** Configured discount percentage for the badge, when set on the package. */
+  discountPercent: number | null;
 }
 
 // ----------------------------------------------------------------------------

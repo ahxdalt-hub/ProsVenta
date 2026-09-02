@@ -38,6 +38,15 @@ export interface IntelligenceActionContext {
   targetId?: string;
   /** Signal id for review_signal. */
   signalId?: string;
+  /**
+   * Preselected target presentation (Phase 4). When the action is launched
+   * from a specific record, the window can start with that target already
+   * selected — the user can still clear or change it in the selector.
+   */
+  targetName?: string;
+  targetSub?: string;
+  targetDomain?: string;
+  targetContact?: string | null;
 }
 
 export interface IntelligenceActionRequest {

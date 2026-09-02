@@ -28,6 +28,10 @@ export async function GET() {
       displayPrice: formatMinorAmount(p.price, p.currency),
       // Objectively configured recommendation only — never invented marketing.
       recommended: p.metadata?.recommended === true,
+      discountPercent:
+        typeof p.metadata?.discount_percent === "number"
+          ? p.metadata.discount_percent
+          : null,
     }));
     return NextResponse.json(body);
   } catch (error) {

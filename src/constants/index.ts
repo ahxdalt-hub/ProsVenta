@@ -13,7 +13,6 @@ export const ROUTES = {
   SIGNUP: "/signup",
   DASHBOARD: "/dashboard",
   DASHBOARD_PROSPECTS: "/dashboard/prospects",
-  DASHBOARD_PROSPECTS_DATABASE: "/dashboard/prospects/database",
   DASHBOARD_PROSPECTS_NEW: "/dashboard/prospects/new",
   DASHBOARD_SAVED_LISTS: "/dashboard/saved-lists",
   DASHBOARD_ANALYTICS: "/dashboard/analytics",

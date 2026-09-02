@@ -31,6 +31,7 @@ import { ProspectTable, ALL_PROSPECT_TABLE_COLUMNS } from "../ProspectTable";
 import { ProspectDetailPanel } from "../ProspectDetailPanel";
 import { ProspectsToolbar, type ProspectToolbarFilters } from "../ProspectsToolbar";
 import { BulkActionBar } from "../BulkActionBar";
+import { deleteProspectsAction } from "@/features/prospects/actions/manage";
 import { SaveToListDialog } from "../SaveToListDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Spinner } from "@/components/ui/Spinner";
@@ -475,6 +476,12 @@ export function ProspectDatabaseWorkspace({
         onEnrich={() => setShowBulkEnrich(true)}
         onResearch={() => openIntelligenceAction({ type: "research_prospect" })}
         onClear={() => setSelectedIds(new Set())}
+        onDelete={async () => {
+          const result = await deleteProspectsAction(Array.from(selectedIds));
+          if (result.error) return { error: result.error };
+          setSelectedIds(new Set());
+          router.refresh();
+        }}
       />
       <SaveToListDialog
         open={showSaveToList && selectedIds.size > 0}

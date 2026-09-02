@@ -14,6 +14,7 @@ import { ProspectsToolbar, type ProspectToolbarFilters } from "./ProspectsToolba
 import { ProspectTableSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { toggleProspectFavoriteAction } from "@/features/prospects/actions/saved-views";
+import { deleteProspectsAction } from "@/features/prospects/actions/manage";
 import { useIntelligenceActionWindow } from "@/features/intelligence/action-window";
 import { EnrichProspectWindow } from "@/features/enrichment/components/EnrichProspectWindow";
 import { BulkActionBar } from "./BulkActionBar";
@@ -287,18 +288,6 @@ export function ProspectsWorkspace({
           countries={countries}
           sources={sources}
         />
-        {/* Phase 4: entry point to the advanced Prospect Database workspace */}
-        <Link
-          href="/dashboard/prospects/database"
-          className="btn-press inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition-all duration-150 hover:bg-slate-50 hover:shadow-md focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:outline-none"
-        >
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <ellipse cx="12" cy="5" rx="9" ry="3" />
-            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-          </svg>
-          <span className="hidden sm:inline">Database</span>
-        </Link>
         <button
           type="button"
           onClick={() => setShowCreateDialog(true)}
@@ -444,6 +433,12 @@ export function ProspectsWorkspace({
         onEnrich={handleBulkEnrich}
         onResearch={() => openIntelligenceAction({ type: "research_prospect" })}
         onClear={() => setSelectedIds(new Set())}
+        onDelete={async () => {
+          const result = await deleteProspectsAction(Array.from(selectedIds));
+          if (result.error) return { error: result.error };
+          setSelectedIds(new Set());
+          router.refresh();
+        }}
       />
       <SaveToListDialog
         open={showSaveToList && selectedIds.size > 0}

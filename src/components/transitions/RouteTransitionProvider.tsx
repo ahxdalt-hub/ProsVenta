@@ -31,7 +31,7 @@ export function useRouteTransition() {
  * they never inherit the authenticated workspace loading experience.
  */
 
-const NAV_MIN_DURATION = 450;
+const NAV_MIN_DURATION = 200;
 
 /** Routes that mount WorkspaceContent and use the fullscreen workspace overlay. */
 const WORKSPACE_ROUTE_PREFIXES = ["/dashboard", "/onboarding"];
