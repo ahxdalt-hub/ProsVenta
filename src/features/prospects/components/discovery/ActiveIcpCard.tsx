@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import { Target, Settings2, ListFilter } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { ActionWindow } from "@/components/action-window/ActionWindow";
+import { settingsDeepLink } from "@/lib/settings/navigation";
 import type { ActiveIcpSummary } from "./icp-summary";
 
 interface ActiveIcpCardProps {
@@ -95,7 +96,7 @@ export function ActiveIcpCard({ icp }: ActiveIcpCardProps) {
             </p>
           </div>
           <Link
-            href="/dashboard/settings/icp"
+            href={settingsDeepLink("icp")}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-navy-900 px-3.5 py-2 text-sm font-medium text-white transition-colors duration-150 hover:bg-navy-800"
           >
             <Settings2 size={14} aria-hidden="true" />
@@ -122,7 +123,7 @@ export function ActiveIcpCard({ icp }: ActiveIcpCardProps) {
           Active ICP
         </span>
         <Link
-          href="/dashboard/settings/icp"
+          href={settingsDeepLink("icp")}
           className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
         >
           <Settings2 size={13} aria-hidden="true" />

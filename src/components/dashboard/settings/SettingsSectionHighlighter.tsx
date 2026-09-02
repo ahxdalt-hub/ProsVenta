@@ -19,9 +19,9 @@ import { useSearchParams } from "next/navigation";
 // ============================================================================
 
 /** How long one glow blink lasts (the `.settings-card-glow` iteration). */
-const BLINK_DURATION_MS = 750;
+const BLINK_DURATION_MS = 2000;
 /** Number of blinks before the glow settles. */
-const BLINK_COUNT = 2;
+const BLINK_COUNT = 1;
 /** How many times to retry finding the card before giving up (~1s total). */
 const MAX_RETRIES = 10;
 const RETRY_DELAY_MS = 100;

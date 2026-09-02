@@ -9,7 +9,7 @@ import {
   getCreditHealth,
 } from "@/features/credits/ui-config";
 import type { CreditSummaryDto } from "@/features/credits/api-types";
-import { settingsHref } from "@/lib/settings/navigation";
+import { settingsDeepLink } from "@/lib/settings/navigation";
 import { EASE_OUT } from "@/lib/motion";
 import { CreditToken } from "./CreditToken";
 import { AnimatedCreditValue } from "./AnimatedCreditValue";
@@ -254,7 +254,7 @@ export function CreditsPopover({
 
             {/* ---- Single CTA into the existing Settings monetization area - */}
             <Link
-              href={settingsHref("credits")}
+              href={settingsDeepLink("credits")}
               onClick={onNavigate}
               className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors duration-150 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
             >

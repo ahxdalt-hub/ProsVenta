@@ -10,6 +10,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/Badge";
+import { settingsDeepLink } from "@/lib/settings/navigation";
 
 interface ContextRow {
   label: string;
@@ -73,7 +74,7 @@ export function WorkspaceContextPanel({
             is configured.
           </p>
           <Link
-            href="/dashboard/settings/icp"
+            href={settingsDeepLink("icp")}
             className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
           >
             Configure your ICP
