@@ -80,7 +80,7 @@ export function CreditBalanceHeader() {
             ? `${CREDIT_LABEL}: ${balance}. Show credits overview.`
             : `${CREDIT_LABEL} balance unavailable. Show credits overview.`
         }
-        className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        className="mr-3 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
         data-testid="credit-balance-header"
         data-health={health}
       >

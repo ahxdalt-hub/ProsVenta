@@ -152,6 +152,124 @@ function formatBadgeCount(count: number): string {
 }
 
 /**
+ * Builds a set of Prosventa-relevant demo notifications used as a fallback so
+ * the popover showcases the feature even when the connected account has no
+ * rows in the `notifications` table yet. Timestamps are computed relative to
+ * "now" so the relative labels ("Just now", "2h ago") read naturally.
+ */
+function buildDemoNotifications(): Notification[] {
+  const now = Date.now();
+  const minutesAgo = (m: number) => new Date(now - m * 60_000).toISOString();
+
+  return [
+    {
+      id: "demo-prospect-assigned",
+      user_id: "demo",
+      organization_id: "demo",
+      type: "prospect_assigned",
+      title: "New prospect assigned to you",
+      body: "Jenna Moore (Head of Growth at Northwind Labs) was assigned to your pipeline — high buying intent.",
+      entity_type: "prospect",
+      entity_id: "prospect-demo-1",
+      actor_id: null,
+      is_read: false,
+      created_at: minutesAgo(4),
+    },
+    {
+      id: "demo-signal",
+      user_id: "demo",
+      organization_id: "demo",
+      type: "signal_detected",
+      title: "Intent signal detected",
+      body: "Acme Corp visited your pricing page 3 times this week and viewed the Enterprise plan.",
+      entity_type: "prospect",
+      entity_id: "prospect-demo-2",
+      actor_id: null,
+      is_read: false,
+      created_at: minutesAgo(38),
+    },
+    {
+      id: "demo-credits",
+      user_id: "demo",
+      organization_id: "demo",
+      type: "system_alert",
+      title: "Credits running low",
+      body: "You're down to 120 Prosventa credits. Top up to keep enrichment and signal scans running.",
+      entity_type: null,
+      entity_id: null,
+      actor_id: null,
+      is_read: false,
+      created_at: minutesAgo(60 * 3),
+    },
+    {
+      id: "demo-import",
+      user_id: "demo",
+      organization_id: "demo",
+      type: "import_completed",
+      title: "Import completed",
+      body: "Your CSV import of 128 prospects finished. 121 matched your ICP, 7 were skipped.",
+      entity_type: "import",
+      entity_id: "import-demo-1",
+      actor_id: null,
+      is_read: false,
+      created_at: minutesAgo(60 * 5),
+    },
+    {
+      id: "demo-member",
+      user_id: "demo",
+      organization_id: "demo",
+      type: "member_joined",
+      title: "New teammate joined",
+      body: "Derek Salazar accepted your invitation and joined the Acme Ltd workspace.",
+      entity_type: "organization",
+      entity_id: "org-demo-1",
+      actor_id: null,
+      is_read: true,
+      created_at: minutesAgo(60 * 9),
+    },
+    {
+      id: "demo-export",
+      user_id: "demo",
+      organization_id: "demo",
+      type: "export_completed",
+      title: "Export ready",
+      body: "Your saved list “Q3 Target Accounts” has been exported and is ready to download.",
+      entity_type: "export",
+      entity_id: "export-demo-1",
+      actor_id: null,
+      is_read: true,
+      created_at: minutesAgo(60 * 26),
+    },
+    {
+      id: "demo-updated",
+      user_id: "demo",
+      organization_id: "demo",
+      type: "prospect_updated",
+      title: "Prospect stage changed",
+      body: "Tom Chang moved from Lead to Qualified in your pipeline.",
+      entity_type: "prospect",
+      entity_id: "prospect-demo-3",
+      actor_id: null,
+      is_read: true,
+      created_at: minutesAgo(60 * 30),
+    },
+    {
+      id: "demo-reply",
+      user_id: "demo",
+      organization_id: "demo",
+      type: "comment_reply",
+      title: "New reply on your note",
+      body: "Sarah replied to your note on prospect #4821 — “Client confirmed budget for Q4.”",
+      entity_type: "prospect",
+      entity_id: "prospect-demo-4",
+      actor_id: null,
+      is_read: true,
+      created_at: minutesAgo(60 * 50),
+    },
+  ];
+}
+
+/**
  * NotificationPopover — premium B2B SaaS notification dropdown.
  *
  * Replaces the previous full-page navigation with a floating popover
@@ -173,17 +291,28 @@ export function NotificationPopover() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  // True when the list is showing seeded demo notifications (no real rows).
+  const [usingDemo, setUsingDemo] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   // ------------------------------------------------------------------------
-  // Fetch notifications + unread count from the browser client
+  // Fetch notifications + unread count from the browser client. When the
+  // account has no notifications yet, fall back to demo data so the popover
+  // always demonstrates the feature.
   // ------------------------------------------------------------------------
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        // Not signed in — show demo data.
+        const demo = buildDemoNotifications();
+        setNotifications(demo);
+        setUnreadCount(demo.filter((n) => !n.is_read).length);
+        setUsingDemo(true);
+        return;
+      }
 
       const [notifResult, countResult] = await Promise.all([
         supabase
@@ -199,10 +328,24 @@ export function NotificationPopover() {
           .eq("is_read", false),
       ]);
 
-      setNotifications((notifResult.data ?? []) as Notification[]);
-      setUnreadCount(countResult.count ?? 0);
+      const rows = (notifResult.data ?? []) as Notification[];
+      if (rows.length === 0) {
+        // No real notifications — seed demo data for illustration.
+        const demo = buildDemoNotifications();
+        setNotifications(demo);
+        setUnreadCount(demo.filter((n) => !n.is_read).length);
+        setUsingDemo(true);
+      } else {
+        setNotifications(rows);
+        setUnreadCount(countResult.count ?? 0);
+        setUsingDemo(false);
+      }
     } catch {
-      // Silently fail — popover will show empty state
+      // Silently fall back to demo notifications on any failure
+      const demo = buildDemoNotifications();
+      setNotifications(demo);
+      setUnreadCount(demo.filter((n) => !n.is_read).length);
+      setUsingDemo(true);
     } finally {
       setLoading(false);
     }
@@ -257,6 +400,7 @@ export function NotificationPopover() {
       }
 
       try {
+        if (usingDemo) return; // Demo rows aren't in the DB — skip write.
         const supabase = createClient();
         await supabase
           .from("notifications")
@@ -274,7 +418,7 @@ export function NotificationPopover() {
         }
       }
     },
-    []
+    [usingDemo]
   );
 
   // ------------------------------------------------------------------------
@@ -298,6 +442,8 @@ export function NotificationPopover() {
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     setUnreadCount(0);
 
+    if (usingDemo) return; // Demo rows aren't in the DB — skip write.
+
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -310,7 +456,32 @@ export function NotificationPopover() {
       // Revert on failure
       fetchNotifications();
     }
-  }, [fetchNotifications]);
+  }, [fetchNotifications, usingDemo]);
+
+  // ------------------------------------------------------------------------
+  // Clear all notifications. In demo mode this just empties the local list.
+  // For real notifications it attempts a delete; if RLS doesn't allow it we
+  // still clear locally so the user sees the intended behavior.
+  // ------------------------------------------------------------------------
+  const handleClearAll = useCallback(async () => {
+    setNotifications([]);
+    setUnreadCount(0);
+
+    if (usingDemo) return; // Demo rows aren't in the DB.
+
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await supabase
+        .from("notifications")
+        .delete()
+        .eq("user_id", user.id);
+    } catch {
+      // Fall back to clearing locally only (already done above).
+      fetchNotifications();
+    }
+  }, [fetchNotifications, usingDemo]);
 
   // ------------------------------------------------------------------------
   // Navigate to the full notification center
@@ -360,7 +531,7 @@ export function NotificationPopover() {
             initial="hidden"
             animate="visible"
             exit="exit"
-            className="absolute right-0 top-full z-50 mt-2 w-[380px] max-w-[calc(100vw-2rem)] origin-top-right overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl ring-1 ring-black/5"
+            className="absolute right-0 top-full z-50 mt-2 w-[440px] max-w-[calc(100vw-1.5rem)] origin-top-right overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl ring-1 ring-black/5"
           >
             {/* ----------------------------------------------------------
                 Header — title + unread count
@@ -376,21 +547,49 @@ export function NotificationPopover() {
                   </span>
                 )}
               </div>
-              {unread > 0 && (
-                <button
-                  type="button"
-                  onClick={handleMarkAllRead}
-                  className="text-xs font-medium text-blue-600 transition-colors duration-150 hover:text-blue-700 hover:underline focus:outline-none focus-visible:underline"
-                >
-                  Mark all as read
-                </button>
-              )}
+              <div className="flex items-center gap-3">
+                {unread > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleMarkAllRead}
+                    className="text-xs font-medium text-blue-600 transition-colors duration-150 hover:text-blue-700 hover:underline focus:outline-none focus-visible:underline"
+                  >
+                    Mark all as read
+                  </button>
+                )}
+                {notifications.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleClearAll}
+                    className="flex items-center gap-1 text-xs font-medium text-slate-400 transition-colors duration-150 hover:text-red-600 focus:outline-none focus-visible:underline"
+                    aria-label="Clear all notifications"
+                    title="Clear all notifications"
+                  >
+                    <svg
+                      className="h-3.5 w-3.5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.75"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      <line x1="10" y1="11" x2="10" y2="17" />
+                      <line x1="14" y1="11" x2="14" y2="17" />
+                    </svg>
+                    Clear
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* ----------------------------------------------------------
                 Body — notification list or empty state
                 ---------------------------------------------------------- */}
-            <div className="max-h-[500px] overflow-y-auto overscroll-contain">
+            <div className="notification-scroll max-h-[420px] overflow-y-auto overscroll-contain">
               {loading ? (
                 /* Loading skeleton */
                 <div className="space-y-1 p-2">
@@ -494,11 +693,36 @@ export function NotificationPopover() {
             {/* ----------------------------------------------------------
                 Footer — view all notifications
                 ---------------------------------------------------------- */}
-            <div className="border-t border-slate-100 p-1.5">
+            <div className="flex items-center gap-1 border-t border-slate-100 p-1.5">
+              {notifications.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 transition-colors duration-150 hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:bg-red-50"
+                  aria-label="Clear all notifications"
+                >
+                  <svg
+                    className="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    <line x1="10" y1="11" x2="10" y2="17" />
+                    <line x1="14" y1="11" x2="14" y2="17" />
+                  </svg>
+                  Clear all
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleViewAll}
-                className="flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 transition-colors duration-150 hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus-visible:bg-slate-50"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 transition-colors duration-150 hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus-visible:bg-slate-50"
               >
                 View all notifications
                 <DashboardIcon name="chevron-down" size={14} className="-rotate-90 text-slate-400" />

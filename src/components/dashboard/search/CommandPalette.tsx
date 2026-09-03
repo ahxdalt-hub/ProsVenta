@@ -26,6 +26,12 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
 
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
+  // Platform-aware modifier label for the footer hint (Cmd on macOS, Ctrl elsewhere).
+  const [isMac, setIsMac] = useState(false);
+  useEffect(() => {
+    setIsMac(/Mac|iPhone|iPad|iPod/i.test(navigator.platform ?? ""));
+  }, []);
+  const shortcutLabel = `${isMac ? "⌘" : "Ctrl"}K`;
 
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -334,7 +340,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                   select
                 </span>
                 <span className="ml-auto flex items-center gap-1.5 text-[11px] text-slate-400">
-                  <kbd className="rounded border border-slate-200 bg-white px-1.5 py-0.5 font-sans text-[10px] font-medium">⌘K</kbd>
+                  <kbd className="rounded border border-slate-200 bg-white px-1.5 py-0.5 font-sans text-[10px] font-medium">{shortcutLabel}</kbd>
                   toggle
                 </span>
               </div>
