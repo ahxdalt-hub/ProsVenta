@@ -1,12 +1,10 @@
-import Link from "next/link";
-import { Check } from "lucide-react";
-import TransitionButton from "@/components/transitions/TransitionButton";
-import TransitionLink from "@/components/transitions/TransitionLink";
+import PlanCard from "@/components/marketing/pricing/PlanCard";
 import PricingPlans from "@/components/marketing/pricing/PricingPlans";
-import { MARKETING_ROUTES } from "@/components/marketing/routes";
+import CreditInfo from "@/components/marketing/pricing/CreditInfo";
+import FinalCta from "@/components/marketing/pricing/FinalCta";
+import Faq from "@/components/marketing/pricing/Faq";
 import {
   BUSINESS_PLAN,
-  CREDIT_DESCRIPTION,
 } from "@/features/plans";
 
 // ============================================================================
@@ -89,161 +87,64 @@ export default function PricingPage() {
         <PricingPlans />
 
         {/* Business Plan (Custom) */}
-        <div className="mt-8 flex justify-center">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold tracking-tight text-slate-900">
-                {BUSINESS_PLAN.name}
-              </h2>
-            </div>
-            
-            <p className="mt-2 text-sm leading-relaxed text-slate-500">
-              {BUSINESS_PLAN.description}
-            </p>
-
-            {/* Price */}
-            <div className="mt-5">
-              <span className="text-4xl font-semibold tracking-tight text-slate-900">
-                {BUSINESS_PLAN.monthlyPrice}
-              </span>
-              <span className="ml-1.5 text-sm text-slate-500">/month</span>
-            </div>
-
-            {/* Credits */}
-            <div className="mt-2">
-              <span className="text-2xl font-semibold tracking-tight text-slate-700">
-                {BUSINESS_PLAN.monthlyCredits}
-              </span>
-              <span className="ml-1.5 text-sm text-slate-500">
-                credits / month
-              </span>
-            </div>
-
-            {/* Features */}
-            <ul className="mt-6 flex-1 space-y-2.5">
-              {BUSINESS_PLAN.features.slice(0, 4).map((feature) => (
-                <li key={feature} className="flex items-start gap-2.5">
-                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-                    <Check className="h-2.5 w-2.5" strokeWidth={3} />
-                  </span>
-                  <span className="text-sm leading-relaxed text-slate-600">
-                    {feature}
-                  </span>
-                </li>
-              ))}
-              {BUSINESS_PLAN.features.length > 4 && (
-                <li className="text-sm text-slate-500">
-                  +{BUSINESS_PLAN.features.length - 4} more features
-                </li>
-              )}
-            </ul>
-
-            {/* CTA */}
-            <TransitionButton
-              href={BUSINESS_PLAN.ctaHref}
-              className="btn-press mt-8 inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-xs hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-            >
-              {BUSINESS_PLAN.ctaText}
-            </TransitionButton>
-          </div>
+        {/* ============================================================
+            [EDIT ME MANUALLY] Business card width (Contact Sales card)
+            - Container max width: max-w-3xl  => 768px  (current)
+              Options: max-w-md = 448px | max-w-lg = 512px |
+                       max-w-xl = 576px | max-w-2xl = 672px |
+                       max-w-3xl = 768px | max-w-4xl = 896px
+            - Inner card min height: min-h-[480px] (optional, remove if unwanted)
+            Data (price, credits, features, CTA) is edited in:
+              src/features/plans/pricing.ts  ->  BUSINESS_PLAN
+            ============================================================ */}
+        <div className="mt-8 flex w-full max-w-3xl justify-center self-center mx-auto">
+          <PlanCard
+            className="w-full min-h-[480px]"
+            name={BUSINESS_PLAN.name}
+            description={BUSINESS_PLAN.description}
+            price={BUSINESS_PLAN.monthlyPrice}
+            interval="/month"
+            credits={BUSINESS_PLAN.monthlyCredits}
+            features={BUSINESS_PLAN.features}
+            visibleCount={4}
+            ctaText={BUSINESS_PLAN.ctaText}
+            ctaHref={BUSINESS_PLAN.ctaHref}
+          />
         </div>
 
-        {/* Credit Information */}
-        <div className="mt-20 rounded-2xl border border-slate-200 bg-white p-6 sm:p-8">
-          <h2 className="text-xl font-semibold tracking-tight text-slate-900">
-            What are credits?
-          </h2>
-          <p className="mt-2 text-sm leading-relaxed text-slate-500">
-            {CREDIT_DESCRIPTION}
-          </p>
-          
-          <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div>
-              <h3 className="text-lg font-semibold tracking-tight text-slate-900">
-                What credits are used for
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                Per-action credit costs:
-              </p>
-              <ul className="mt-6 space-y-3">
-                {CREDIT_COSTS.map((item) => (
-                  <li
-                    key={item.action}
-                    className="flex items-center justify-between border-b border-slate-100 pb-3 last:border-0 last:pb-0"
-                  >
-                  <span className="text-sm text-slate-600">{item.action}</span>
-                  <span className="text-sm font-semibold text-slate-900">
-                    {item.cost} credit{item.cost > 1 ? "s" : ""}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          </div>
-        </div>
+        {/* Credit Information — interactive dark "How credits work" card */}
+        {/* [EDIT ME MANUALLY] Credit info section:
+            - Costs data: CREDIT_COSTS array at the top of this file
+            - Icons + descriptions per action: ACTION_META in
+              src/components/marketing/pricing/CreditInfo.tsx
+            - Card is full page-container width; to narrow it, wrap it in a
+              max-w-* div with mx-auto */}
+        <CreditInfo costs={CREDIT_COSTS} />
 
         {/* FAQ */}
         <div className="mx-auto mt-24 max-w-3xl">
           <div className="text-center">
-            <h2 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-              Frequently asked questions
+            <span className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-medium text-blue-700 shadow-xs">
+              <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+              FAQ
+            </span>
+            <h2 className="mt-5 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+              Frequently asked <span className="text-gradient">questions</span>
             </h2>
+            <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-slate-600">
+              Everything you need to know about plans, credits, and how
+              Prosventa works.
+            </p>
           </div>
-          <div className="mt-10 space-y-4">
-            {FAQS.map((faq) => (
-              <details
-                key={faq.q}
-                className="group rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-xs"
-              >
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-semibold text-slate-900 [&::-webkit-details-marker]:hidden">
-                  {faq.q}
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition-transform duration-200 group-open:rotate-45">
-                    +
-                  </span>
-                </summary>
-                <p className="mt-3 text-sm leading-relaxed text-slate-600">
-                  {faq.a}
-                </p>
-              </details>
-            ))}
+          <div className="mt-10">
+            <Faq faqs={FAQS} />
           </div>
         </div>
 
-        {/* Final CTA */}
-        <div className="mt-24 rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center shadow-xs sm:px-12">
-          <h2 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-            Start finding better prospects.
-          </h2>
-          <p className="mx-auto mt-4 max-w-xl text-lg leading-relaxed text-slate-600">
-            Create a free workspace — search, organize, and export prospects
-            today. Add intelligence when you are ready.
-          </p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-            <TransitionButton
-              href={MARKETING_ROUTES.GET_STARTED}
-              className="btn-press inline-flex items-center justify-center rounded-xl bg-navy-900 px-6 py-3 text-sm font-semibold text-white shadow-md hover:bg-navy-800 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-            >
-              Get Started
-            </TransitionButton>
-            <TransitionLink
-              href={MARKETING_ROUTES.EXPLORE}
-              className="btn-press inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-700 shadow-xs hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-            >
-              Explore Prosventa
-            </TransitionLink>
-          </div>
-          <p className="mt-6 text-xs text-slate-400">
-            By using Prosventa you agree to our{" "}
-            <Link href="/terms" className="text-slate-500 underline decoration-slate-300 hover:text-slate-700">
-              Terms of Service
-            </Link>{" "}
-            and{" "}
-            <Link href="/privacy" className="text-slate-500 underline decoration-slate-300 hover:text-slate-700">
-              Privacy Policy
-            </Link>
-            .
-          </p>
-        </div>
+        {/* Final CTA — interactive light-blue card (cursor spotlight, scroll-in
+            animations, animated buttons). Edit in:
+            src/components/marketing/pricing/FinalCta.tsx */}
+        <FinalCta />
       </div>
     </div>
   );

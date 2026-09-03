@@ -8,6 +8,7 @@ import {
 } from "@/features/settings/actions/avatar";
 import { updateProfileAction } from "@/features/settings/actions/settings";
 import { SettingsCard, SettingsCardHeader, SettingsRow } from "../SettingsCard";
+import { AvatarCropModal } from "./AvatarCropModal";
 import { EASE_OUT } from "@/lib/motion";
 import { useShellData } from "@/components/dashboard/layout/ShellDataProvider";
 import { Avatar } from "@/components/ui/Avatar";
@@ -48,6 +49,10 @@ export function ProfileClient({ profile, email, workspaceName, role, onDirtyChan
   const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl);
   const [avatarState, setAvatarState] = useState<AvatarState>("idle");
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  // Pending crop step: the picked image is staged here (object URL) and only
+  // uploaded after the user confirms the circular crop.
+  const [cropImageUrl, setCropImageUrl] = useState<string | null>(null);
+  const [cropFileName, setCropFileName] = useState("");
 
   const [fullName, setFullName] = useState(profile.fullName ?? "");
   const [jobRole, setJobRole] = useState(profile.jobRole ?? "");
@@ -78,9 +83,29 @@ export function ProfileClient({ profile, email, workspaceName, role, onDirtyChan
       return;
     }
 
+    // Don't upload instantly - stage the image for the circular crop step.
+    setCropFileName(file.name);
+    setCropImageUrl(URL.createObjectURL(file));
+  }
+
+  // Crop cancelled: discard the staged image, no upload happens.
+  function handleCropCancelled() {
+    setCropImageUrl((url) => {
+      if (url) URL.revokeObjectURL(url);
+      return null;
+    });
+  }
+
+  // Crop confirmed: upload the cropped image through the existing action.
+  async function handleCropConfirmed(cropped: File) {
+    setCropImageUrl((url) => {
+      if (url) URL.revokeObjectURL(url);
+      return null;
+    });
+
     setAvatarState("uploading");
     const formData = new FormData();
-    formData.append("avatar", file);
+    formData.append("avatar", cropped);
     try {
       const result = await uploadProfileImageAction(formData);
       if (result.error || !result.avatarUrl) {
@@ -211,7 +236,7 @@ export function ProfileClient({ profile, email, workspaceName, role, onDirtyChan
             </h3>
             <p className="mt-0.5 truncate text-sm font-medium text-slate-500">{email}</p>
             <p className="mt-2 max-w-md text-[13px] leading-relaxed text-slate-500">
-              Click your photo to upload a new one. JPG, PNG, WebP or GIF up to 5MB.
+              Click your photo to upload a new one — you can crop it to a circle before it is saved. JPG, PNG, WebP or GIF up to 5MB.
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <button
@@ -391,9 +416,21 @@ export function ProfileClient({ profile, email, workspaceName, role, onDirtyChan
           </SettingsRow>
         </div>
       </SettingsCard>
+
+      {/* Post-pick crop step: circle guide + square grid before upload */}
+      {cropImageUrl && (
+        <AvatarCropModal
+          imageUrl={cropImageUrl}
+          fileName={cropFileName}
+          onConfirm={(cropped) => void handleCropConfirmed(cropped)}
+          onCancel={handleCropCancelled}
+        />
+      )}
     </div>
   );
 }
+
+/* ------------------------------ Tiny icons ------------------------------- */
 
 /* ------------------------------ Tiny icons ------------------------------- */
 

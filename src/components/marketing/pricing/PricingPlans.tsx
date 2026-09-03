@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check } from "lucide-react";
-import TransitionButton from "@/components/transitions/TransitionButton";
+import PlanCard from "@/components/marketing/pricing/PlanCard";
 import {
   PUBLIC_PLANS,
   PLAN_DISPLAY_ORDER,
@@ -64,81 +63,20 @@ export default function PricingPlans() {
             : "/month";
 
           return (
-            <div
+            <PlanCard
               key={plan.key}
-              className={`flex flex-col rounded-2xl border bg-white p-6 shadow-xs ${
-                plan.isPopular
-                  ? "border-blue-200 ring-1 ring-blue-100"
-                  : "border-slate-200"
-              }`}
-            >
-              {/* Plan Header */}
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold tracking-tight text-slate-900">
-                  {plan.name}
-                </h2>
-                {plan.label && (
-                  <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700">
-                    {plan.label}
-                  </span>
-                )}
-              </div>
-
-              <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                {plan.description}
-              </p>
-
-              {/* Price */}
-              <div className="mt-5">
-                <span className="text-4xl font-semibold tracking-tight text-slate-900">
-                  {displayPrice}
-                </span>
-                <span className="ml-1.5 text-sm text-slate-500">
-                  {displayInterval}
-                </span>
-              </div>
-
-              {/* Credits */}
-              <div className="mt-2">
-                <span className="text-2xl font-semibold tracking-tight text-slate-700">
-                  {formatCredits(plan.monthlyCredits)}
-                </span>
-                <span className="ml-1.5 text-sm text-slate-500">
-                  credits / month
-                </span>
-              </div>
-
-              {/* Features */}
-              <ul className="mt-6 flex-1 space-y-2.5">
-                {plan.features.slice(0, 6).map((feature) => (
-                  <li key={feature} className="flex items-start gap-2.5">
-                    <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-                      <Check className="h-2.5 w-2.5" strokeWidth={3} />
-                    </span>
-                    <span className="text-sm leading-relaxed text-slate-600">
-                      {feature}
-                    </span>
-                  </li>
-                ))}
-                {plan.features.length > 6 && (
-                  <li className="text-sm text-slate-500">
-                    +{plan.features.length - 6} more features
-                  </li>
-                )}
-              </ul>
-
-              {/* CTA */}
-              <TransitionButton
-                href={plan.ctaHref}
-                className={`btn-press mt-8 inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${
-                  plan.isPopular
-                    ? "bg-navy-900 text-white shadow-md hover:bg-navy-800"
-                    : "border border-slate-300 bg-white text-slate-700 shadow-xs hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900"
-                }`}
-              >
-                {plan.ctaText}
-              </TransitionButton>
-            </div>
+              name={plan.name}
+              description={plan.description}
+              price={displayPrice}
+              interval={displayInterval}
+              credits={formatCredits(plan.monthlyCredits)}
+              label={plan.label}
+              isPopular={plan.isPopular}
+              features={plan.features}
+              visibleCount={6}
+              ctaText={plan.ctaText}
+              ctaHref={plan.ctaHref}
+            />
           );
         })}
       </div>

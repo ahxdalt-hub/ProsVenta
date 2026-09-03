@@ -28,7 +28,7 @@ const INDUSTRY_OPTIONS = [
   { value: "finance", label: "Finance" },
   { value: "healthcare", label: "Healthcare" },
   { value: "retail", label: "Retail" },
-  { value: "other", label: "Other" },
+  { value: "other", label: "Something else (type it in)" },
 ];
 
 const COMPANY_SIZE_OPTIONS = [
@@ -44,7 +44,7 @@ const JOB_ROLE_OPTIONS = [
   { value: "sales", label: "Sales" },
   { value: "marketing", label: "Marketing" },
   { value: "operations", label: "Operations" },
-  { value: "other", label: "Other" },
+  { value: "other", label: "Something else (type it in)" },
 ];
 
 const STEPS = ["Your details", "Ideal customer", "First prospects"];
@@ -130,6 +130,13 @@ function StepProfile({ onDone }: { onDone: () => void }) {
     initialState
   );
 
+  // "Something else" support: when the user picks the type-it-in option we
+  // reveal a text field and submit what they typed instead of "other".
+  const [industryChoice, setIndustryChoice] = useState("");
+  const [jobRoleChoice, setJobRoleChoice] = useState("");
+  const [industryOther, setIndustryOther] = useState("");
+  const [jobRoleOther, setJobRoleOther] = useState("");
+
   // Success (no redirect — the wizard advances to step 2).
   useEffect(() => {
     if (state?.success) onDone();
@@ -152,12 +159,19 @@ function StepProfile({ onDone }: { onDone: () => void }) {
         placeholder="Enter your company name"
       />
 
+      {/* The real submitted values — the typed text wins when "Something
+          else" is selected, otherwise the picked option value. */}
+      <input type="hidden" name="industry" value={industryChoice === "other" ? industryOther.trim() : industryChoice} />
+      <input type="hidden" name="jobRole" value={jobRoleChoice === "other" ? jobRoleOther.trim() : jobRoleChoice} />
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <OnboardingSelect
           label="Industry"
-          name="industry"
+          name="industryChoice"
           options={INDUSTRY_OPTIONS}
           placeholder="Select your industry"
+          value={industryChoice}
+          onChange={(value) => setIndustryChoice(value)}
         />
 
         <OnboardingSelect
@@ -168,12 +182,35 @@ function StepProfile({ onDone }: { onDone: () => void }) {
         />
       </div>
 
+      {industryChoice === "other" && (
+        <OnboardingInput
+          label="Describe your industry"
+          name="industryOther"
+          placeholder="e.g. Logistics, Agriculture, Education..."
+          value={industryOther}
+          onChange={(e) => setIndustryOther(e.target.value)}
+          autoFocus
+        />
+      )}
+
       <OnboardingSelect
         label="Your Role"
-        name="jobRole"
+        name="jobRoleChoice"
         options={JOB_ROLE_OPTIONS}
         placeholder="Select your role"
+        value={jobRoleChoice}
+        onChange={(value) => setJobRoleChoice(value)}
       />
+
+      {jobRoleChoice === "other" && (
+        <OnboardingInput
+          label="Describe your role"
+          name="jobRoleOther"
+          placeholder="e.g. Business Development Manager, Customer Success..."
+          value={jobRoleOther}
+          onChange={(e) => setJobRoleOther(e.target.value)}
+        />
+      )}
 
       <div className="pt-2">
         <PrimaryButton
