@@ -1,21 +1,23 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import TransitionLink from "@/components/transitions/TransitionLink";
 import TransitionButton from "@/components/transitions/TransitionButton";
 import { BrandLogo } from "@/components/branding/BrandLogo";
-import { MARKETING_ROUTES } from "@/components/marketing/routes";
 
 // Homepage navigation — anchors scroll to established homepage sections.
 const navLinks = [
   { label: "Product", href: "#product" },
   { label: "Features", href: "#features" },
   { label: "Explore", href: "#explore" },
+  { label: "Pricing", href: "#pricing" },
 ];
 
 export default function Navigation() {
+  const router = useRouter();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("");
@@ -66,6 +68,10 @@ export default function Navigation() {
     const target = document.querySelector(href);
     if (target) {
       target.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      // The section lives on the homepage — head there and let Next.js
+      // position the anchor (e.g. clicking Pricing while on /explore).
+      router.push(`/${href}`, { scroll: true });
     }
     setMobileOpen(false);
   };
@@ -112,12 +118,6 @@ export default function Navigation() {
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-3">
-            <TransitionLink
-              href={MARKETING_ROUTES.PRICING}
-              className="px-3 py-2 rounded-md text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-            >
-              Pricing
-            </TransitionLink>
             <TransitionLink
               href="/login"
               className="px-3 py-2 rounded-md text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
@@ -210,13 +210,6 @@ export default function Navigation() {
                   </a>
                 ))}
                 <hr className="my-2 border-slate-100" />
-                <TransitionLink
-                  href={MARKETING_ROUTES.PRICING}
-                  onClick={() => setMobileOpen(false)}
-                  className="block py-3 px-3 rounded-xl text-base font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-colors duration-150"
-                >
-                  Pricing
-                </TransitionLink>
                 <TransitionLink
                   href="/login"
                   onClick={() => setMobileOpen(false)}

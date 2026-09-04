@@ -4,6 +4,7 @@ import Features from "@/components/marketing/features/Features";
 import ProductExperience from "@/components/marketing/product-experience/ProductExperience";
 import BrandOrigin from "@/components/marketing/brand-origin/BrandOrigin";
 import Explore from "@/components/marketing/explore/Explore";
+import PricingSection from "@/components/marketing/pricing/PricingSection";
 
 // Public homepage — Phase 7.
 // Hero, product journey (Find → Enrich → Understand → Prioritize → Act),
@@ -18,6 +19,7 @@ export default function HomePage() {
       <ProductExperience />
       <BrandOrigin />
       <Explore />
+      <PricingSection />
     </>
   );
 }

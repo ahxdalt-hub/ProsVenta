@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import PlanCard from "@/components/marketing/pricing/PlanCard";
 import {
   PUBLIC_PLANS,
@@ -10,17 +11,35 @@ import {
   formatCredits,
 } from "@/features/plans";
 
+const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
+
+const container = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.1, delayChildren: 0.05 } },
+};
+
+const slideFromRight = {
+  hidden: { opacity: 0, x: 90 },
+  show: { opacity: 1, x: 0, transition: { duration: 0.7, ease: EASE } },
+};
+
 export default function PricingPlans() {
   const [billingInterval, setBillingInterval] = useState<"monthly" | "annual">("monthly");
+  const reduce = useReducedMotion();
 
   const toggleBilling = () => {
     setBillingInterval(billingInterval === "monthly" ? "annual" : "monthly");
   };
 
   return (
-    <>
+    <motion.div
+      variants={container}
+      initial={reduce ? false : "hidden"}
+      whileInView={reduce ? undefined : "show"}
+      viewport={{ once: true, amount: 0.1 }}
+    >
       {/* Billing Toggle */}
-      <div className="mt-10 flex items-center justify-center gap-2">
+      <motion.div variants={slideFromRight} className="mt-10 flex items-center justify-center gap-2">
         <span className="text-sm font-medium text-slate-600">Monthly</span>
         <button
           type="button"
@@ -48,7 +67,7 @@ export default function PricingPlans() {
             {BILLING_CONFIG.annualSavings}
           </span>
         )}
-      </div>
+      </motion.div>
 
       {/* Plans Grid */}
       <div className="mt-16 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -63,23 +82,25 @@ export default function PricingPlans() {
             : "/month";
 
           return (
-            <PlanCard
-              key={plan.key}
-              name={plan.name}
-              description={plan.description}
-              price={displayPrice}
-              interval={displayInterval}
-              credits={formatCredits(plan.monthlyCredits)}
-              label={plan.label}
-              isPopular={plan.isPopular}
-              features={plan.features}
-              visibleCount={6}
-              ctaText={plan.ctaText}
-              ctaHref={plan.ctaHref}
-            />
+            <motion.div key={plan.key} variants={slideFromRight} className="h-full">
+              <PlanCard
+                className="h-full"
+                name={plan.name}
+                description={plan.description}
+                price={displayPrice}
+                interval={displayInterval}
+                credits={formatCredits(plan.monthlyCredits)}
+                label={plan.label}
+                isPopular={plan.isPopular}
+                features={plan.features}
+                visibleCount={6}
+                ctaText={plan.ctaText}
+                ctaHref={plan.ctaHref}
+              />
+            </motion.div>
           );
         })}
       </div>
-    </>
+    </motion.div>
   );
 }
